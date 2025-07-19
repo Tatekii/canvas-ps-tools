@@ -1,0 +1,11 @@
+[install]
+# 启用缓存优化
+cache = true
+
+# 可选：配置包管理器
+registry = "https://registry.npmjs.org/"
+
+[dev]
+# 开发服务器配置
+port = 5173
+host = "localhost"
