@@ -129,7 +129,15 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 					}
 				}
 			}
-		}, [image, tolerance]) // 只依赖必要的值
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, [image]) // 移除tolerance依赖，避免容差变化时重新初始化工具
+
+		// 专门处理容差变化的useEffect
+		useEffect(() => {
+			if (magicWandTool && tolerance !== undefined) {
+				magicWandTool.setTolerance(tolerance)
+			}
+		}, [tolerance, magicWandTool])
 
 		const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 			const file = event.target.files?.[0]
