@@ -297,18 +297,40 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 			if (canvas) {
 				const ctx = canvas.getContext("2d")
 				if (ctx) {
-					const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-					const data = imageData.data
-					const selectionData = selection.data
+					// 使用Canvas合成模式进行高效的选区删除
+					// 保存当前状态
+					ctx.save()
+					
+					// 创建临时路径用于选区遮罩
+					const tempCanvas = document.createElement('canvas')
+					tempCanvas.width = canvas.width
+					tempCanvas.height = canvas.height
+					const tempCtx = tempCanvas.getContext('2d')
+					
+					if (tempCtx) {
+						// 将选区绘制到临时画布
+						tempCtx.putImageData(selection, 0, 0)
+						
+						// 使用合成模式删除选区
+						ctx.globalCompositeOperation = 'destination-out'
+						ctx.drawImage(tempCanvas, 0, 0)
+					} else {
+						// 降级到逐像素操作
+						const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+						const data = imageData.data
+						const selectionData = selection.data
 
-					for (let i = 0; i < selectionData.length; i += 4) {
-						if (selectionData[i + 3] > 0) {
-							// 将选区内的像素设为透明
-							data[i + 3] = 0
+						for (let i = 0; i < selectionData.length; i += 4) {
+							if (selectionData[i + 3] > 0) {
+								// 将选区内的像素设为透明
+								data[i + 3] = 0
+							}
 						}
+						ctx.putImageData(imageData, 0, 0)
 					}
-
-					ctx.putImageData(imageData, 0, 0)
+					
+					// 恢复状态
+					ctx.restore()
 					clearSelection()
 				}
 			}

@@ -61,35 +61,131 @@ export class SelectionManager {
       return;
     }
 
-    // 合并选区
+    // 使用Canvas API进行高效的选区合并
+    this.currentSelection = this.mergeSelectionsWithCanvas(this.currentSelection, newSelection, mode);
+  }
+
+  /**
+   * 使用Canvas API高效合并选区
+   */
+  private mergeSelectionsWithCanvas(existing: Uint8Array, newSelection: Uint8Array, mode: SelectionMode): Uint8Array {
+    // 创建临时canvas
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = this.width;
+    tempCanvas.height = this.height;
+    const ctx = tempCanvas.getContext('2d');
+    
+    if (!ctx) {
+      // 降级到手动合并
+      return this.mergeSelectionsManually(existing, newSelection, mode);
+    }
+
+    // 清除画布
+    ctx.clearRect(0, 0, this.width, this.height);
+
+    // 将现有选区转换为ImageData并绘制
+    const existingImageData = this.createImageDataFromMask(existing);
+    
+    // 创建临时画布来正确处理合成操作
+    const tempCanvas2 = document.createElement('canvas');
+    tempCanvas2.width = this.width;
+    tempCanvas2.height = this.height;
+    const ctx2 = tempCanvas2.getContext('2d');
+    
+    if (!ctx2) {
+      return this.mergeSelectionsManually(existing, newSelection, mode);
+    }
+
+    // 在第一个画布上绘制现有选区
+    ctx.putImageData(existingImageData, 0, 0);
+
+    // 在第二个画布上绘制新选区
+    const newImageData = this.createImageDataFromMask(newSelection);
+    ctx2.putImageData(newImageData, 0, 0);
+
+    // 根据模式进行合成
+    switch (mode) {
+      case SelectionMode.ADD:
+        // 并集：使用 lighter 混合模式实现真正的并集
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(tempCanvas2, 0, 0);
+        break;
+      case SelectionMode.SUBTRACT:
+        // 差集：从现有选区中移除新选区
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.drawImage(tempCanvas2, 0, 0);
+        break;
+      case SelectionMode.INTERSECT:
+        // 交集：只保留两个选区的重叠部分
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.drawImage(tempCanvas2, 0, 0);
+        break;
+      default:
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(tempCanvas2, 0, 0);
+    }
+
+    // 获取合并结果
+    const resultImageData = ctx.getImageData(0, 0, this.width, this.height);
+    return this.createMaskFromImageData(resultImageData);
+  }
+
+  /**
+   * 降级的手动合并方法
+   */
+  private mergeSelectionsManually(existing: Uint8Array, newSelection: Uint8Array, mode: SelectionMode): Uint8Array {
     const result = new Uint8Array(this.width * this.height);
     
     for (let i = 0; i < result.length; i++) {
-      const existing = this.currentSelection[i];
+      const existingPixel = existing[i];
       const newPixel = newSelection[i];
 
       switch (mode) {
         case SelectionMode.ADD:
-          // 并集：任一为真则为真
-          result[i] = existing || newPixel ? 1 : 0;
+          result[i] = existingPixel || newPixel ? 1 : 0;
           break;
-        
         case SelectionMode.SUBTRACT:
-          // 差集：现有为真但新的为假时保持选中
-          result[i] = existing && !newPixel ? 1 : 0;
+          result[i] = existingPixel && !newPixel ? 1 : 0;
           break;
-        
         case SelectionMode.INTERSECT:
-          // 交集：两者都为真
-          result[i] = existing && newPixel ? 1 : 0;
+          result[i] = existingPixel && newPixel ? 1 : 0;
           break;
-        
         default:
           result[i] = newPixel;
       }
     }
 
-    this.currentSelection = result;
+    return result;
+  }
+
+  /**
+   * 从遮罩创建ImageData
+   */
+  private createImageDataFromMask(mask: Uint8Array): ImageData {
+    const imageData = new ImageData(this.width, this.height);
+    for (let i = 0; i < mask.length; i++) {
+      const dataIndex = i * 4;
+      if (mask[i]) {
+        imageData.data[dataIndex] = 255;     // R
+        imageData.data[dataIndex + 1] = 255; // G
+        imageData.data[dataIndex + 2] = 255; // B
+        imageData.data[dataIndex + 3] = 255; // A
+      }
+    }
+    return imageData;
+  }
+
+  /**
+   * 从ImageData创建遮罩
+   */
+  private createMaskFromImageData(imageData: ImageData): Uint8Array {
+    const mask = new Uint8Array(this.width * this.height);
+    for (let i = 0; i < mask.length; i++) {
+      const dataIndex = i * 4;
+      // 检查alpha通道判断是否被选中
+      mask[i] = imageData.data[dataIndex + 3] > 128 ? 1 : 0;
+    }
+    return mask;
   }
 
   /**

@@ -87,11 +87,14 @@ export class MagicWandTool {
     const deltaR = color1[0] - color2[0];
     const deltaG = color1[1] - color2[1];
     const deltaB = color1[2] - color2[2];
-    // 不考虑Alpha通道的差异，因为在相同图片上Alpha应该一致
-    // const deltaA = color1[3] - color2[3];
     
-    // 使用欧几里得距离，但只考虑RGB
-    return Math.sqrt(deltaR * deltaR + deltaG * deltaG + deltaB * deltaB);
+    // 使用感知加权的颜色距离，更符合人眼视觉
+    // 人眼对绿色最敏感，对蓝色最不敏感
+    const weightedDistance = 0.299 * deltaR * deltaR + 
+                           0.587 * deltaG * deltaG + 
+                           0.114 * deltaB * deltaB;
+    
+    return Math.sqrt(weightedDistance);
   }
 
   private floodFill(

@@ -82,44 +82,39 @@ export class LassoTool {
     const height = this.canvas.height;
     const mask = new Uint8Array(width * height);
 
-    // 使用扫描线算法填充多边形
-    for (let y = 0; y < height; y++) {
-      const intersections = this.getIntersections(y);
-      intersections.sort((a, b) => a - b);
+    // 使用Canvas API进行高效的多边形填充
+    // 创建临时canvas用于路径填充
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    if (!tempCtx) return mask;
 
-      for (let i = 0; i < intersections.length; i += 2) {
-        if (i + 1 < intersections.length) {
-          const startX = Math.ceil(intersections[i]);
-          const endX = Math.floor(intersections[i + 1]);
+    // 使用Canvas Path API填充多边形
+    tempCtx.fillStyle = 'white';
+    tempCtx.beginPath();
+    tempCtx.moveTo(this.path[0][0], this.path[0][1]);
+    
+    for (let i = 1; i < this.path.length; i++) {
+      tempCtx.lineTo(this.path[i][0], this.path[i][1]);
+    }
+    
+    tempCtx.closePath();
+    tempCtx.fill();
 
-          for (let x = startX; x <= endX; x++) {
-            if (x >= 0 && x < width) {
-              const index = y * width + x;
-              mask[index] = 1;
-            }
-          }
-        }
-      }
+    // 从Canvas获取填充结果
+    const imageData = tempCtx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // 转换为选区遮罩（检查alpha通道）
+    for (let i = 0; i < mask.length; i++) {
+      const pixelIndex = i * 4;
+      // 如果像素不是完全透明，则认为在选区内
+      mask[i] = data[pixelIndex + 3] > 0 ? 1 : 0;
     }
 
     return mask;
-  }
-
-  private getIntersections(y: number): number[] {
-    const intersections: number[] = [];
-    
-    for (let i = 0; i < this.path.length; i++) {
-      const j = (i + 1) % this.path.length;
-      const [x1, y1] = this.path[i];
-      const [x2, y2] = this.path[j];
-
-      if ((y1 <= y && y < y2) || (y2 <= y && y < y1)) {
-        const x = x1 + (y - y1) * (x2 - x1) / (y2 - y1);
-        intersections.push(x);
-      }
-    }
-
-    return intersections;
   }
 
   private clearPath() {
