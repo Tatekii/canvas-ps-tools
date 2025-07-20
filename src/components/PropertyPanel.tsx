@@ -45,13 +45,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedTool, tolerance, 
 					</div>
 				</div>
 			)}
-
-			{selectionArea !== undefined && selectionArea > 0 && (
-				<div className="mt-6 p-3 bg-gray-800 rounded-lg">
-					<h4 className="text-gray-300 text-sm mb-2">选区信息</h4>
-					<p className="text-blue-400 text-sm">面积: {selectionArea.toLocaleString()} 像素</p>
-				</div>
-			)}
 		</div>
 	)
 }

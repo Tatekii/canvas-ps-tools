@@ -64,10 +64,7 @@ function App() {
       {/* 顶部标题栏 */}
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-white text-xl font-semibold">在线PS工具</h1>
-          <div className="text-gray-400 text-sm">
-            魔术棒选区 • 套索选区 • 专业图像编辑
-          </div>
+          <h1 className="text-white text-xl font-semibold">canvas-ps-tools</h1>
         </div>
       </header>
 

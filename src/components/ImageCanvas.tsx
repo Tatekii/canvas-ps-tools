@@ -425,6 +425,7 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 								</svg>
 								<p className="text-lg font-medium">上传图片开始编辑</p>
 								<p className="text-sm mt-2">支持 PNG, JPG, GIF 格式</p>
+								<p className="text-sm mt-2">不超过10MB</p>
 							</div>
 							<button
 								onClick={() => fileInputRef.current?.click()}
