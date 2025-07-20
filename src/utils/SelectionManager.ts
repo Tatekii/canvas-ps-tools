@@ -75,7 +75,7 @@ export class SelectionManager {
           break;
         
         case SelectionMode.SUBTRACT:
-          // 差集：现有为真且新的为假
+          // 差集：现有为真但新的为假时保持选中
           result[i] = existing && !newPixel ? 1 : 0;
           break;
         

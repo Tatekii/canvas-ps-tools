@@ -42,8 +42,21 @@ export class MagicWandTool {
     
     if (!targetColor) return false;
 
+    // 检查点击位置是否在现有选区内
+    const clickIndex = Math.floor(y) * width + Math.floor(x);
+    const existingSelection = this.selectionManager.getCurrentSelection();
+    const isInExistingSelection = existingSelection && existingSelection[clickIndex] === 1;
+
+    // 对于减法操作，如果点击在现有选区内，使用更宽松的容差确保完全移除
+    let effectiveTolerance = this.tolerance;
+    if (mode === SelectionMode.SUBTRACT && isInExistingSelection) {
+      // 增加容差以确保能选择到边缘像素
+      // 这有助于确保减法操作能够完全移除原先选择的区域
+      effectiveTolerance = Math.max(this.tolerance, 50);
+    }
+
     // 使用泛洪填充算法创建新选区
-    this.floodFill(Math.floor(x), Math.floor(y), targetColor, newMask, width, height);
+    this.floodFill(Math.floor(x), Math.floor(y), targetColor, newMask, width, height, effectiveTolerance);
 
     // 通过SelectionManager应用新选区
     this.selectionManager.applySelection(newMask, mode);
@@ -74,9 +87,11 @@ export class MagicWandTool {
     const deltaR = color1[0] - color2[0];
     const deltaG = color1[1] - color2[1];
     const deltaB = color1[2] - color2[2];
-    const deltaA = color1[3] - color2[3];
+    // 不考虑Alpha通道的差异，因为在相同图片上Alpha应该一致
+    // const deltaA = color1[3] - color2[3];
     
-    return Math.sqrt(deltaR * deltaR + deltaG * deltaG + deltaB * deltaB + deltaA * deltaA);
+    // 使用欧几里得距离，但只考虑RGB
+    return Math.sqrt(deltaR * deltaR + deltaG * deltaG + deltaB * deltaB);
   }
 
   private floodFill(
@@ -85,8 +100,10 @@ export class MagicWandTool {
     targetColor: [number, number, number, number], 
     mask: Uint8Array, 
     width: number, 
-    height: number
+    height: number,
+    tolerance?: number
   ) {
+    const effectiveTolerance = tolerance !== undefined ? tolerance : this.tolerance;
     const stack: [number, number][] = [[startX, startY]];
     const visited = new Set<string>();
 
@@ -103,12 +120,14 @@ export class MagicWandTool {
       if (!currentColor) continue;
 
       const distance = this.colorDistance(currentColor, targetColor);
-      if (distance > this.tolerance) continue;
+      
+      // 使用传入的有效容差
+      if (distance > effectiveTolerance) continue;
 
       const index = y * width + x;
       mask[index] = 1;
 
-      // 添加相邻像素到堆栈
+      // 添加相邻像素到堆栈（4连通）
       stack.push([x + 1, y]);
       stack.push([x - 1, y]);
       stack.push([x, y + 1]);

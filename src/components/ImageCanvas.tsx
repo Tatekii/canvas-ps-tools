@@ -3,8 +3,8 @@ import { MagicWandTool } from "../utils/MagicWandTool"
 import { LassoTool } from "../utils/LassoTool"
 import { SelectionRenderer } from "../utils/SelectionRenderer"
 import { SelectionManager } from "../utils/SelectionManager"
-import { SelectionMode } from "../utils/SelectionTypes"
-import { getSelectionModeFromEvent } from "../utils/KeyboardUtils"
+import { getSelectionModeFromEvent, getShortcutHints } from "../utils/KeyboardUtils"
+import { useSelectionMode } from "../hooks/useSelectionMode"
 
 interface ImageCanvasRef {
 	clearSelection: () => void
@@ -14,12 +14,11 @@ interface ImageCanvasRef {
 interface ImageCanvasProps {
 	selectedTool: string
 	tolerance: number
-	selectionMode: SelectionMode
 	onSelectionChange: (hasSelection: boolean, area?: number) => void
 }
 
 const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
-	({ selectedTool, tolerance, selectionMode, onSelectionChange }, ref) => {
+	({ selectedTool, tolerance, onSelectionChange }, ref) => {
 		const canvasRef = useRef<HTMLCanvasElement>(null)
 		const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
 		const fileInputRef = useRef<HTMLInputElement>(null)
@@ -31,7 +30,16 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 		const [lassoTool, setLassoTool] = useState<LassoTool | null>(null)
 		const [selectionRenderer, setSelectionRenderer] = useState<SelectionRenderer | null>(null)
 		const [isDrawing, setIsDrawing] = useState(false)
-		const [currentShortcut, setCurrentShortcut] = useState<string>("")
+
+		// 使用自定义Hook处理选区模式和键盘事件
+		const { currentMode, shortcutText } = useSelectionMode({
+			selectedTool,
+			hasImage: !!image,
+			enableKeyboardControl: true,
+		})
+
+		// 获取快捷键提示
+		const shortcuts = getShortcutHints()
 
 		// 只在组件初次挂载时调用一次，用于处理没有图片时的初始化
 		useEffect(() => {
@@ -123,39 +131,6 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 			}
 		}, [image, tolerance]) // 只依赖必要的值
 
-		// 键盘快捷键状态监听
-		useEffect(() => {
-			const handleGlobalKeyDown = (e: KeyboardEvent) => {
-				// 检查修饰键来判断选区模式
-				const isShiftPressed = e.shiftKey
-				const isCtrlCmdPressed = e.ctrlKey || e.metaKey
-				const platform = navigator.userAgent.toLowerCase().includes("mac") ? "mac" : "win"
-
-				let shortcutText = ""
-				if (isShiftPressed && isCtrlCmdPressed) {
-					shortcutText = `Hold ${platform === "mac" ? "Cmd+Shift" : "Ctrl+Shift"} to INTERSECT selection`
-				} else if (isCtrlCmdPressed) {
-					shortcutText = `Hold ${platform === "mac" ? "Cmd" : "Ctrl"} to SUBTRACT from selection`
-				} else if (isShiftPressed) {
-					shortcutText = "Hold Shift to ADD to selection"
-				}
-
-				setCurrentShortcut(shortcutText)
-			}
-
-			const handleGlobalKeyUp = () => {
-				setCurrentShortcut("")
-			}
-
-			document.addEventListener("keydown", handleGlobalKeyDown)
-			document.addEventListener("keyup", handleGlobalKeyUp)
-
-			return () => {
-				document.removeEventListener("keydown", handleGlobalKeyDown)
-				document.removeEventListener("keyup", handleGlobalKeyUp)
-			}
-		}, [])
-
 		const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 			const file = event.target.files?.[0]
 			if (file) {
@@ -229,20 +204,28 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 			if (selectedTool === "magic-wand" && magicWandTool && selectionManager) {
 				// 根据按键确定选区模式
 				const eventMode = getSelectionModeFromEvent(event.nativeEvent)
-				const actualMode = eventMode || selectionMode
+				const actualMode = eventMode || currentMode
 
 				const success = magicWandTool.select(pos.x, pos.y, actualMode)
 
 				if (success) {
 					// 获取当前选区用于渲染和状态更新
 					const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-					setSelection(currentSelection)
-
-					if (selectionRenderer && currentSelection) {
-						selectionRenderer.renderSelection(currentSelection)
-						const area = selectionManager.getSelectionArea()
-						onSelectionChange(true, area)
+					
+					// 检查是否真的有选区（不是空选区）
+					if (selectionManager.hasSelection() && currentSelection) {
+						setSelection(currentSelection)
+						if (selectionRenderer) {
+							selectionRenderer.renderSelection(currentSelection)
+							const area = selectionManager.getSelectionArea()
+							onSelectionChange(true, area)
+						}
 					} else {
+						// 选区为空，清除状态
+						setSelection(null)
+						if (selectionRenderer) {
+							selectionRenderer.clearSelection()
+						}
 						onSelectionChange(false)
 					}
 				} else {
@@ -267,19 +250,27 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 		const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
 			if (selectedTool === "lasso" && lassoTool && isDrawing && selectionManager) {
 				setIsDrawing(false)
-				const mode = getSelectionModeFromEvent(event.nativeEvent)
+				const mode = getSelectionModeFromEvent(event.nativeEvent) || currentMode
 				const success = lassoTool.finishPath(mode)
 
 				if (success) {
 					// 获取当前选区用于渲染
 					const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-					setSelection(currentSelection)
-
-					if (selectionRenderer && currentSelection) {
-						selectionRenderer.renderSelection(currentSelection)
-						const area = selectionManager.getSelectionArea()
-						onSelectionChange(true, area)
+					
+					// 检查是否真的有选区（不是空选区）
+					if (selectionManager.hasSelection() && currentSelection) {
+						setSelection(currentSelection)
+						if (selectionRenderer) {
+							selectionRenderer.renderSelection(currentSelection)
+							const area = selectionManager.getSelectionArea()
+							onSelectionChange(true, area)
+						}
 					} else {
+						// 选区为空，清除状态
+						setSelection(null)
+						if (selectionRenderer) {
+							selectionRenderer.clearSelection()
+						}
 						onSelectionChange(false)
 					}
 				} else {
@@ -327,13 +318,21 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 			if (selectionManager) {
 				selectionManager.invertSelection()
 				const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-				setSelection(currentSelection)
-
-				if (selectionRenderer && currentSelection) {
-					selectionRenderer.renderSelection(currentSelection)
-					const area = selectionManager.getSelectionArea()
-					onSelectionChange(true, area)
+				
+				// 检查是否真的有选区（不是空选区）
+				if (selectionManager.hasSelection() && currentSelection) {
+					setSelection(currentSelection)
+					if (selectionRenderer) {
+						selectionRenderer.renderSelection(currentSelection)
+						const area = selectionManager.getSelectionArea()
+						onSelectionChange(true, area)
+					}
 				} else {
+					// 选区为空，清除状态
+					setSelection(null)
+					if (selectionRenderer) {
+						selectionRenderer.clearSelection()
+					}
 					onSelectionChange(false)
 				}
 			}
@@ -343,12 +342,22 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 			if (selectionManager) {
 				selectionManager.selectAll()
 				const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-				setSelection(currentSelection)
-
-				if (selectionRenderer && currentSelection) {
-					selectionRenderer.renderSelection(currentSelection)
-					const area = selectionManager.getSelectionArea()
-					onSelectionChange(true, area)
+				
+				// 检查是否真的有选区（不是空选区）
+				if (selectionManager.hasSelection() && currentSelection) {
+					setSelection(currentSelection)
+					if (selectionRenderer) {
+						selectionRenderer.renderSelection(currentSelection)
+						const area = selectionManager.getSelectionArea()
+						onSelectionChange(true, area)
+					}
+				} else {
+					// 选区为空，清除状态（理论上selectAll不应该产生空选区，但为了一致性）
+					setSelection(null)
+					if (selectionRenderer) {
+						selectionRenderer.clearSelection()
+					}
+					onSelectionChange(false)
 				}
 			}
 		}, [selectionManager, selectionRenderer, onSelectionChange])
@@ -366,7 +375,7 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 		)
 
 		return (
-			<div className="flex-1 bg-gray-800 p-4 flex flex-col items-center justify-center">
+			<div className="flex-1 bg-gray-800 p-4 flex flex-col items-center justify-center relative">
 				{!image ? (
 					<div className="text-center">
 						<div className="border-2 border-dashed border-gray-600 rounded-lg p-12 mb-4">
@@ -403,43 +412,45 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 						/>
 					</div>
 				) : (
-					<div className="relative inline-block">
-						<canvas
-							ref={canvasRef}
-							className="border border-gray-600 rounded-lg shadow-lg bg-white"
-							style={{
-								imageRendering: "crisp-edges",
-							}}
-						/>
-						<canvas
-							ref={overlayCanvasRef}
-							className="absolute top-0 left-0 border border-gray-600 rounded-lg shadow-lg bg-transparent pointer-events-auto"
-							onMouseDown={handleMouseDown}
-							onMouseMove={handleMouseMove}
-							onMouseUp={handleMouseUp}
-							onMouseLeave={handleMouseUp}
-							style={{
-								cursor:
-									selectedTool === "magic-wand"
-										? "crosshair"
-										: selectedTool === "lasso"
-										? "crosshair"
-										: "default",
-							}}
-						/>
+					<>
+						<div className="relative inline-block">
+							<canvas
+								ref={canvasRef}
+								className="border border-gray-600 rounded-lg shadow-lg bg-white"
+								style={{
+									imageRendering: "crisp-edges",
+								}}
+							/>
+							<canvas
+								ref={overlayCanvasRef}
+								className="absolute top-0 left-0 border border-gray-600 rounded-lg shadow-lg bg-transparent pointer-events-auto"
+								onMouseDown={handleMouseDown}
+								onMouseMove={handleMouseMove}
+								onMouseUp={handleMouseUp}
+								onMouseLeave={handleMouseUp}
+								style={{
+									cursor:
+										selectedTool === "magic-wand"
+											? "crosshair"
+											: selectedTool === "lasso"
+											? "crosshair"
+											: "default",
+								}}
+							/>
 
-						<div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-lg text-sm">
-							{selectedTool === "magic-wand"
-								? "魔术棒工具"
-								: selectedTool === "lasso"
-								? "套索工具"
-								: selectedTool === "move"
-								? "移动工具"
-								: "选择工具"}
-							{selection && <div className="text-xs text-green-400 mt-1">选区激活 ✨</div>}
-							{currentShortcut && <div className="text-xs text-yellow-400 mt-1">{currentShortcut}</div>}
+							<div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-4 py-3 rounded-lg text-sm max-w-64">
+								{selection && <div className="text-xs text-green-400">选区激活 ✨ </div>}
+								{shortcutText && <div className="text-xs text-yellow-400 mt-2">{shortcutText}</div>}
+							</div>
 						</div>
-					</div>
+						{/* 快捷键提示 */}
+						<div className="absolute right-4 top-4 text-xs text-gray-300 border border-gray-600 p-2">
+							<div className="text-xs text-gray-400 mb-1">快捷键:</div>
+							<div>{shortcuts.add}</div>
+							<div>{shortcuts.subtract}</div>
+							<div>{shortcuts.intersect}</div>
+						</div>
+					</>
 				)}
 			</div>
 		)

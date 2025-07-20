@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import Toolbar from './components/Toolbar';
 import ImageCanvas from './components/ImageCanvas';
 import PropertyPanel from './components/PropertyPanel';
-import { SelectionMode } from './utils/SelectionTypes';
 
 interface ImageCanvasRef {
   clearSelection: () => void;
@@ -16,7 +15,6 @@ function App() {
   const [tolerance, setTolerance] = useState(32);
   const [hasSelection, setHasSelection] = useState(false);
   const [selectionArea, setSelectionArea] = useState<number | undefined>();
-  const [selectionMode, setSelectionMode] = useState<SelectionMode>(SelectionMode.NEW);
   const [undoStack] = useState<string[]>([]);
   const [redoStack] = useState<string[]>([]);
   
@@ -93,16 +91,13 @@ function App() {
           ref={canvasRef}
           selectedTool={selectedTool}
           tolerance={tolerance}
-          selectionMode={selectionMode}
           onSelectionChange={handleSelectionChange}
         />
         
         <PropertyPanel
           selectedTool={selectedTool}
           tolerance={tolerance}
-          selectionMode={selectionMode}
           onToleranceChange={setTolerance}
-          onSelectionModeChange={setSelectionMode}
           selectionArea={selectionArea}
         />
       </div>
