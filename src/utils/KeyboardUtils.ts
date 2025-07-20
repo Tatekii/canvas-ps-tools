@@ -27,13 +27,12 @@ export const isAltModifier = (event: KeyboardEvent | MouseEvent) => {
 // 选区模式快捷键检测
 export const getSelectionModeFromEvent = (event: MouseEvent): SelectionMode => {
 	const hasShift = isShiftModifier(event)
-	const hasAlt = isAltModifier(event)
 	const hasModifier = isModifierKey(event)
 
-	if (hasShift && hasAlt) {
-		return SelectionMode.INTERSECT // Shift + Alt = 交集
-	} else if (hasAlt || hasModifier) {
-		return SelectionMode.SUBTRACT // Alt 或 Ctrl/Cmd = 减去
+	if (hasShift && hasModifier) {
+		return SelectionMode.INTERSECT // Shift + Ctrl/Cmd = 交集
+	} else if (hasModifier) {
+		return SelectionMode.SUBTRACT // Ctrl/Cmd = 减去
 	} else if (hasShift) {
 		return SelectionMode.ADD // Shift = 添加
 	} else {
