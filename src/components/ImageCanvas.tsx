@@ -21,6 +21,7 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 	({ selectedTool, tolerance, onSelectionChange }, ref) => {
 		const canvasRef = useRef<HTMLCanvasElement>(null)
 		const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
+		const lassoPreviewCanvasRef = useRef<HTMLCanvasElement>(null)
 		const fileInputRef = useRef<HTMLInputElement>(null)
 
 		const [image, setImage] = useState<HTMLImageElement | null>(null)
@@ -64,12 +65,14 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 
 				const canvas = canvasRef.current
 				const overlayCanvas = overlayCanvasRef.current
+				const lassoPreviewCanvas = lassoPreviewCanvasRef.current
 
-				if (canvas && overlayCanvas && image.complete && image.naturalWidth > 0) {
+				if (canvas && overlayCanvas && lassoPreviewCanvas && image.complete && image.naturalWidth > 0) {
 					const ctx = canvas.getContext("2d")
 					const overlayCtx = overlayCanvas.getContext("2d")
+					const lassoPreviewCtx = lassoPreviewCanvas.getContext("2d")
 
-					if (ctx && overlayCtx) {
+					if (ctx && overlayCtx && lassoPreviewCtx) {
 						// 计算适合画布的图像尺寸
 						const maxWidth = 800
 						const maxHeight = 600
@@ -86,16 +89,21 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 						canvas.height = height
 						overlayCanvas.width = width
 						overlayCanvas.height = height
+						lassoPreviewCanvas.width = width
+						lassoPreviewCanvas.height = height
 
 						// 重置canvas样式尺寸
 						canvas.style.width = ""
 						canvas.style.height = ""
 						overlayCanvas.style.width = ""
 						overlayCanvas.style.height = ""
+						lassoPreviewCanvas.style.width = ""
+						lassoPreviewCanvas.style.height = ""
 
 						// 清除画布
 						ctx.clearRect(0, 0, width, height)
 						overlayCtx.clearRect(0, 0, width, height)
+						lassoPreviewCtx.clearRect(0, 0, width, height)
 
 						// 设置白色背景
 						ctx.fillStyle = "white"
@@ -118,7 +126,7 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 							// 直接在这里初始化工具，避免函数依赖
 							const manager = new SelectionManager(width, height)
 							const magicWand = new MagicWandTool(canvas, manager, tolerance)
-							const lasso = new LassoTool(overlayCanvas, manager)
+							const lasso = new LassoTool(lassoPreviewCanvas, manager)
 							const renderer = new SelectionRenderer(overlayCanvas)
 
 							setSelectionManager(manager)
@@ -466,6 +474,13 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 											: selectedTool === "lasso"
 											? "crosshair"
 											: "default",
+								}}
+							/>
+							<canvas
+								ref={lassoPreviewCanvasRef}
+								className="absolute top-0 left-0 border border-gray-600 rounded-lg shadow-lg bg-transparent pointer-events-none"
+								style={{
+									zIndex: 10, // 确保套索预览在最上层
 								}}
 							/>
 
