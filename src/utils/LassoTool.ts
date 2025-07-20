@@ -1,10 +1,15 @@
+import { SelectionMode } from './SelectionTypes';
+import { SelectionManager } from './SelectionManager';
+
 export class LassoTool {
   private canvas: HTMLCanvasElement;
   private path: [number, number][] = [];
   private isDrawing = false;
+  private selectionManager: SelectionManager;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, selectionManager: SelectionManager) {
     this.canvas = canvas;
+    this.selectionManager = selectionManager;
   }
 
   startPath(x: number, y: number) {
@@ -34,16 +39,17 @@ export class LassoTool {
     this.drawPath();
   }
 
-  finishPath(): ImageData | null {
+  finishPath(mode: SelectionMode = SelectionMode.NEW): boolean {
     if (this.path.length < 3) {
       this.clearPath();
-      return null;
+      return false;
     }
 
     this.isDrawing = false;
-    const selection = this.createSelection();
+    const mask = this.createSelectionMask();
+    this.selectionManager.applySelection(mask, mode);
     this.clearPath();
-    return selection;
+    return true;
   }
 
   private drawPath() {
@@ -71,10 +77,10 @@ export class LassoTool {
     ctx.stroke();
   }
 
-  private createSelection(): ImageData {
+  private createSelectionMask(): Uint8Array {
     const width = this.canvas.width;
     const height = this.canvas.height;
-    const selectionData = new ImageData(width, height);
+    const mask = new Uint8Array(width * height);
 
     // 使用扫描线算法填充多边形
     for (let y = 0; y < height; y++) {
@@ -88,18 +94,15 @@ export class LassoTool {
 
           for (let x = startX; x <= endX; x++) {
             if (x >= 0 && x < width) {
-              const index = (y * width + x) * 4;
-              selectionData.data[index] = 255;     // R
-              selectionData.data[index + 1] = 255; // G
-              selectionData.data[index + 2] = 255; // B
-              selectionData.data[index + 3] = 255; // A
+              const index = y * width + x;
+              mask[index] = 1;
             }
           }
         }
       }
     }
 
-    return selectionData;
+    return mask;
   }
 
   private getIntersections(y: number): number[] {
@@ -126,13 +129,5 @@ export class LassoTool {
     }
     this.path = [];
     this.isDrawing = false;
-  }
-
-  getSelectionArea(selection: ImageData): number {
-    let area = 0;
-    for (let i = 3; i < selection.data.length; i += 4) {
-      if (selection.data[i] > 0) area++;
-    }
-    return area;
   }
 }

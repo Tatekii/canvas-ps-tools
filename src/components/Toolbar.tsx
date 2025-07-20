@@ -1,5 +1,5 @@
 import React from 'react';
-import { Move, MousePointer, Lasso, Wand2, RotateCcw, RotateCw, Trash2, ToggleLeft } from 'lucide-react';
+import { Move, MousePointer, Lasso, Wand2, RotateCcw, RotateCw, Trash2, ToggleLeft, Square } from 'lucide-react';
 
 interface ToolbarProps {
   selectedTool: string;
@@ -8,6 +8,7 @@ interface ToolbarProps {
   onRedo: () => void;
   onClearSelection: () => void;
   onInvertSelection: () => void;
+  onSelectAll: () => void;
   onDeleteSelected: () => void;
   canUndo: boolean;
   canRedo: boolean;
@@ -21,6 +22,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onRedo,
   onClearSelection,
   onInvertSelection,
+  onSelectAll,
   onDeleteSelected,
   canUndo,
   canRedo,
@@ -86,6 +88,22 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
         {hasSelection && (
           <>
+            <button
+              onClick={onSelectAll}
+              className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-200 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white"
+              title="全选"
+            >
+              <Square size={18} />
+            </button>
+
+            <button
+              onClick={onInvertSelection}
+              className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-200 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white"
+              title="反转选区"
+            >
+              <ToggleLeft size={18} />
+            </button>
+
             <button
               onClick={onClearSelection}
               className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-200 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white"

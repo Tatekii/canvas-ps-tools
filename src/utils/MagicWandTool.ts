@@ -1,58 +1,54 @@
+import { SelectionMode } from './SelectionTypes';
+import { SelectionManager } from './SelectionManager';
+
 export class MagicWandTool {
   private canvas: HTMLCanvasElement;
   private tolerance: number;
   private imageData: ImageData | null = null;
+  private selectionManager: SelectionManager;
 
-  constructor(canvas: HTMLCanvasElement, tolerance: number = 32) {
+  constructor(canvas: HTMLCanvasElement, selectionManager: SelectionManager, tolerance: number = 32) {
     this.canvas = canvas;
     this.tolerance = tolerance;
+    this.selectionManager = selectionManager;
   }
 
   setTolerance(tolerance: number) {
     this.tolerance = tolerance;
   }
 
-  select(x: number, y: number): ImageData | null {
-    const ctx = this.canvas.getContext('2d');
-    if (!ctx) return null;
+  select(x: number, y: number, mode: SelectionMode = SelectionMode.NEW): boolean {
+    const ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return false;
 
     // 边界检查
     if (x < 0 || y < 0 || x >= this.canvas.width || y >= this.canvas.height) {
-      return null;
+      return false;
     }
 
     try {
       this.imageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
     } catch (error) {
       console.error('Failed to get image data:', error);
-      return null;
+      return false;
     }
 
     const width = this.imageData.width;
     const height = this.imageData.height;
     
-    // 创建选区遮罩
-    const mask = new Uint8Array(width * height);
+    // 创建新选区遮罩
+    const newMask = new Uint8Array(width * height);
     const targetColor = this.getPixelColor(Math.floor(x), Math.floor(y));
     
-    if (!targetColor) return null;
+    if (!targetColor) return false;
 
-    // 使用泛洪填充算法
-    this.floodFill(Math.floor(x), Math.floor(y), targetColor, mask, width, height);
+    // 使用泛洪填充算法创建新选区
+    this.floodFill(Math.floor(x), Math.floor(y), targetColor, newMask, width, height);
 
-    // 创建选区ImageData
-    const selectionData = new ImageData(width, height);
-    for (let i = 0; i < mask.length; i++) {
-      const dataIndex = i * 4;
-      if (mask[i]) {
-        selectionData.data[dataIndex] = 255;     // R
-        selectionData.data[dataIndex + 1] = 255; // G
-        selectionData.data[dataIndex + 2] = 255; // B
-        selectionData.data[dataIndex + 3] = 255; // A
-      }
-    }
+    // 通过SelectionManager应用新选区
+    this.selectionManager.applySelection(newMask, mode);
 
-    return selectionData;
+    return true;
   }
 
   private getPixelColor(x: number, y: number): [number, number, number, number] | null {
@@ -118,13 +114,5 @@ export class MagicWandTool {
       stack.push([x, y + 1]);
       stack.push([x, y - 1]);
     }
-  }
-
-  getSelectionArea(selection: ImageData): number {
-    let area = 0;
-    for (let i = 3; i < selection.data.length; i += 4) {
-      if (selection.data[i] > 0) area++;
-    }
-    return area;
   }
 }

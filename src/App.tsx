@@ -2,10 +2,13 @@ import { useState, useRef } from 'react';
 import Toolbar from './components/Toolbar';
 import ImageCanvas from './components/ImageCanvas';
 import PropertyPanel from './components/PropertyPanel';
+import { SelectionMode } from './utils/SelectionTypes';
 
 interface ImageCanvasRef {
   clearSelection: () => void;
   deleteSelected: () => void;
+  invertSelection: () => void;
+  selectAll: () => void;
 }
 
 function App() {
@@ -13,6 +16,7 @@ function App() {
   const [tolerance, setTolerance] = useState(32);
   const [hasSelection, setHasSelection] = useState(false);
   const [selectionArea, setSelectionArea] = useState<number | undefined>();
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>(SelectionMode.NEW);
   const [undoStack] = useState<string[]>([]);
   const [redoStack] = useState<string[]>([]);
   
@@ -40,8 +44,15 @@ function App() {
   };
 
   const handleInvertSelection = () => {
-    // TODO: 实现反选功能
-    console.log('Invert selection');
+    if (canvasRef.current) {
+      canvasRef.current.invertSelection();
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (canvasRef.current) {
+      canvasRef.current.selectAll();
+    }
   };
 
   const handleDeleteSelected = () => {
@@ -71,6 +82,7 @@ function App() {
           onRedo={handleRedo}
           onClearSelection={handleClearSelection}
           onInvertSelection={handleInvertSelection}
+          onSelectAll={handleSelectAll}
           onDeleteSelected={handleDeleteSelected}
           canUndo={undoStack.length > 0}
           canRedo={redoStack.length > 0}
@@ -81,13 +93,16 @@ function App() {
           ref={canvasRef}
           selectedTool={selectedTool}
           tolerance={tolerance}
+          selectionMode={selectionMode}
           onSelectionChange={handleSelectionChange}
         />
         
         <PropertyPanel
           selectedTool={selectedTool}
           tolerance={tolerance}
+          selectionMode={selectionMode}
           onToleranceChange={setTolerance}
+          onSelectionModeChange={setSelectionMode}
           selectionArea={selectionArea}
         />
       </div>
