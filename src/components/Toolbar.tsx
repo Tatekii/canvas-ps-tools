@@ -1,22 +1,10 @@
 import React from "react"
-import {
-	Move,
-	MousePointer,
-	Lasso,
-	Wand2,
-	RotateCcw,
-	RotateCw,
-	Trash2,
-	ToggleLeft,
-	Square,
-	Redo,
-	Trash,
-	Redo2,
-} from "lucide-react"
+import { Move, MousePointer, Lasso, Wand2, RotateCcw, RotateCw, Redo2, LucideIcon, X } from "lucide-react"
+import { EditTools, EditToolTypes } from "../constants"
 
 interface ToolbarProps {
 	selectedTool: string
-	onToolSelect: (tool: string) => void
+	onToolSelect: (tool: EditToolTypes) => void
 	onUndo: () => void
 	onRedo: () => void
 	onClearSelection: () => void
@@ -28,6 +16,13 @@ interface ToolbarProps {
 	hasSelection: boolean
 }
 
+const tools: { id: EditToolTypes; icon: LucideIcon; name: string }[] = [
+	{ id: EditTools.MOVE, icon: Move, name: "移动工具" },
+	{ id: EditTools.SELECT, icon: MousePointer, name: "选择工具" },
+	{ id: EditTools.LASSO, icon: Lasso, name: "套索工具" },
+	{ id: EditTools.MAGIC_WAND, icon: Wand2, name: "魔术棒" },
+]
+
 const Toolbar: React.FC<ToolbarProps> = ({
 	selectedTool,
 	onToolSelect,
@@ -35,19 +30,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
 	onRedo,
 	onClearSelection,
 	onInvertSelection,
-	onSelectAll,
-	onDeleteSelected,
 	canUndo,
 	canRedo,
 	hasSelection,
 }) => {
-	const tools = [
-		{ id: "move", icon: Move, name: "移动工具" },
-		{ id: "select", icon: MousePointer, name: "选择工具" },
-		{ id: "lasso", icon: Lasso, name: "套索工具" },
-		{ id: "magic-wand", icon: Wand2, name: "魔术棒" },
-	]
-
 	return (
 		<div className="bg-gray-900 w-16 flex flex-col items-center py-4 border-r border-gray-700">
 			{/* 工具按钮 */}
@@ -122,7 +108,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 							className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-200 bg-red-400 hover:text-white hover:bg-red-500 text-gray-400"
 							title="清除选区"
 						>
-							<Trash size={18} />
+							<X size={18} />
 						</button>
 						{/* 
             <button

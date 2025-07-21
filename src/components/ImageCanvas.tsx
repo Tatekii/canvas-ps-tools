@@ -3,8 +3,11 @@ import { MagicWandTool } from "../utils/MagicWandTool"
 import { LassoTool } from "../utils/LassoTool"
 import { SelectionRenderer } from "../utils/SelectionRenderer"
 import { SelectionManager } from "../utils/SelectionManager"
-import { getSelectionModeFromEvent, getShortcutHints } from "../utils/KeyboardUtils"
+import { getShortcutHints } from "../utils/KeyboardUtils"
 import { useSelectionMode } from "../hooks/useSelectionMode"
+import { useMouseEvent } from "../hooks/useMouseEvent"
+import { useCanvasTransform } from "../hooks/useCanvasTransform"
+import { ZoomControls } from "./ZoomControls"
 
 interface ImageCanvasRef {
 	clearSelection: () => void
@@ -23,6 +26,10 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 		const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
 		const lassoPreviewCanvasRef = useRef<HTMLCanvasElement>(null)
 		const fileInputRef = useRef<HTMLInputElement>(null)
+		const containerRef = useRef<HTMLDivElement>(null) // 画框容器引用
+
+		// TODO
+		const [isCanvasReady, setIsCanvasReady] = useState<boolean>(false)
 
 		const [image, setImage] = useState<HTMLImageElement | null>(null)
 		const [selection, setSelection] = useState<ImageData | null>(null)
@@ -30,7 +37,19 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 		const [magicWandTool, setMagicWandTool] = useState<MagicWandTool | null>(null)
 		const [lassoTool, setLassoTool] = useState<LassoTool | null>(null)
 		const [selectionRenderer, setSelectionRenderer] = useState<SelectionRenderer | null>(null)
-		const [isDrawing, setIsDrawing] = useState(false)
+
+		// 使用画布变换Hook
+		const canvasTransform = useCanvasTransform({
+			canvasRef,
+			overlayCanvasRef,
+			lassoPreviewCanvasRef,
+			containerRef,
+			selectedTool,
+			minZoom: 0.1,
+			maxZoom: 5,
+			zoomStep: 0.1,
+			isCanvasReady
+		})
 
 		// 使用自定义Hook处理选区模式和键盘事件
 		const { currentMode, shortcutText } = useSelectionMode({
@@ -42,7 +61,61 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 		// 获取快捷键提示
 		const shortcuts = getShortcutHints()
 
-		// 只在组件初次挂载时调用一次，用于处理没有图片时的初始化
+		// 使用鼠标事件处理Hook
+		const { handleMouseDown, handleMouseMove, handleMouseUp } = useMouseEvent({
+			selectedTool,
+			image,
+			magicWandTool,
+			lassoTool,
+			selectionManager,
+			selectionRenderer,
+			currentMode,
+			onSelectionChange,
+			setSelection,
+			canvasRef: overlayCanvasRef,
+			containerRef,
+			transformPoint: canvasTransform.transformPoint,
+		})
+
+		// 组合的鼠标事件处理
+		const combinedMouseDown = useCallback(
+			(event: React.MouseEvent<HTMLCanvasElement>) => {
+				// 先处理画布变换（拖拽移动）
+				canvasTransform.handleMouseDown(event)
+
+				// 如果不是变换操作且不是移动工具，则处理工具操作
+				if (!canvasTransform.isDragging && selectedTool !== "move" && event.button === 0) {
+					handleMouseDown(event)
+				}
+			},
+			[canvasTransform, handleMouseDown, selectedTool]
+		)
+
+		const combinedMouseMove = useCallback(
+			(event: React.MouseEvent<HTMLCanvasElement>) => {
+				// 先处理画布变换
+				canvasTransform.handleMouseMove(event)
+
+				// 如果不是拖拽状态且不是移动工具，则处理工具操作
+				if (!canvasTransform.isDragging && selectedTool !== "move") {
+					handleMouseMove(event)
+				}
+			},
+			[canvasTransform, handleMouseMove, selectedTool]
+		)
+
+		const combinedMouseUp = useCallback(
+			(event: React.MouseEvent<HTMLCanvasElement>) => {
+				// 处理画布变换
+				canvasTransform.handleMouseUp()
+
+				// 如果不是移动工具，处理工具操作
+				if (selectedTool !== "move") {
+					handleMouseUp(event)
+				}
+			},
+			[canvasTransform, handleMouseUp, selectedTool]
+		) // 只在组件初次挂载时调用一次，用于处理没有图片时的初始化
 		useEffect(() => {
 			// 这个 effect 现在主要用于组件清理
 			return () => {
@@ -74,8 +147,8 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 
 					if (ctx && overlayCtx && lassoPreviewCtx) {
 						// 计算适合画布的图像尺寸
-						const maxWidth = 800
-						const maxHeight = 600
+						const maxWidth = 1080
+						const maxHeight = 720
 						let { naturalWidth: width, naturalHeight: height } = image
 
 						if (width > maxWidth || height > maxHeight) {
@@ -122,22 +195,23 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 						})
 
 						// 绘制完成后初始化工具
-						setTimeout(() => {
-							// 直接在这里初始化工具，避免函数依赖
-							const manager = new SelectionManager(width, height)
-							const magicWand = new MagicWandTool(canvas, manager, tolerance)
-							const lasso = new LassoTool(lassoPreviewCanvas, manager)
-							const renderer = new SelectionRenderer(overlayCanvas)
 
-							setSelectionManager(manager)
-							setMagicWandTool(magicWand)
-							setLassoTool(lasso)
-							setSelectionRenderer(renderer)
-						}, 50)
+						// 直接在这里初始化工具，避免函数依赖
+						const manager = new SelectionManager(width, height)
+						const magicWand = new MagicWandTool(canvas, manager, tolerance)
+						const lasso = new LassoTool(lassoPreviewCanvas, manager)
+						const renderer = new SelectionRenderer(overlayCanvas)
+
+						setSelectionManager(manager)
+						setMagicWandTool(magicWand)
+						setLassoTool(lasso)
+						setSelectionRenderer(renderer)
+
+						setIsCanvasReady(true)
 					}
 				}
 			}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [image]) // 移除tolerance依赖，避免容差变化时重新初始化工具
 
 		// 专门处理容差变化的useEffect
@@ -147,153 +221,64 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 			}
 		}, [tolerance, magicWandTool])
 
-		const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-			const file = event.target.files?.[0]
-			if (file) {
-				// 检查文件类型
-				if (!file.type.startsWith("image/")) {
-					alert("请选择有效的图片文件")
-					return
-				}
+		const handleImageUpload = useCallback(
+			(event: React.ChangeEvent<HTMLInputElement>) => {
+				const file = event.target.files?.[0]
+				if (file) {
+					// 检查文件类型
+					if (!file.type.startsWith("image/")) {
+						alert("请选择有效的图片文件")
+						return
+					}
 
-				// 检查文件大小 (限制为10MB)
-				const maxSize = 10 * 1024 * 1024
-				if (file.size > maxSize) {
-					alert("图片文件太大，请选择小于10MB的图片")
-					return
-				}
+					// 检查文件大小 (限制为10MB)
+					const maxSize = 10 * 1024 * 1024
+					if (file.size > maxSize) {
+						alert("图片文件太大，请选择小于10MB的图片")
+						return
+					}
 
-				const reader = new FileReader()
-				reader.onload = (e) => {
-					console.log("FileReader 加载完成")
-					const img = new Image()
-					img.onload = () => {
-						console.log("图片 onload 触发", {
-							complete: img.complete,
-							naturalWidth: img.naturalWidth,
-							naturalHeight: img.naturalHeight,
-						})
-						// 确保图片完全加载
-						if (img.complete && img.naturalWidth > 0) {
-							console.log("图片验证通过，开始设置state")
-							setImage(img)
-							// 清除之前的选区
-							setSelection(null)
-							onSelectionChange(false)
-							// 不在这里直接调用 drawImage，而是通过 useEffect 监听 image state 变化
-						} else {
-							console.error("图片验证失败", { complete: img.complete, naturalWidth: img.naturalWidth })
+					const reader = new FileReader()
+					reader.onload = (e) => {
+						console.log("FileReader 加载完成")
+						const img = new Image()
+						img.onload = () => {
+							console.log("图片 onload 触发", {
+								complete: img.complete,
+								naturalWidth: img.naturalWidth,
+								naturalHeight: img.naturalHeight,
+							})
+							// 确保图片完全加载
+							if (img.complete && img.naturalWidth > 0) {
+								console.log("图片验证通过，开始设置state")
+								setImage(img)
+								// 清除之前的选区
+								setSelection(null)
+								onSelectionChange(false)
+								// 不在这里直接调用 drawImage，而是通过 useEffect 监听 image state 变化
+							} else {
+								console.error("图片验证失败", {
+									complete: img.complete,
+									naturalWidth: img.naturalWidth,
+								})
+								alert("图片加载失败，请尝试其他图片")
+							}
+						}
+						img.onerror = (error) => {
+							console.error("图片加载错误:", error)
 							alert("图片加载失败，请尝试其他图片")
 						}
+						console.log("设置图片src")
+						img.src = e.target?.result as string
 					}
-					img.onerror = (error) => {
-						console.error("图片加载错误:", error)
-						alert("图片加载失败，请尝试其他图片")
+					reader.onerror = () => {
+						alert("文件读取失败，请重试")
 					}
-					console.log("设置图片src")
-					img.src = e.target?.result as string
+					reader.readAsDataURL(file)
 				}
-				reader.onerror = () => {
-					alert("文件读取失败，请重试")
-				}
-				reader.readAsDataURL(file)
-			}
-		}
-
-		const getMousePos = (event: React.MouseEvent<HTMLCanvasElement>) => {
-			const canvas = overlayCanvasRef.current
-			if (canvas) {
-				const rect = canvas.getBoundingClientRect()
-				return {
-					x: event.clientX - rect.left,
-					y: event.clientY - rect.top,
-				}
-			}
-			return { x: 0, y: 0 }
-		}
-
-		const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
-			if (!image) return
-
-			const pos = getMousePos(event)
-
-			if (selectedTool === "magic-wand" && magicWandTool && selectionManager) {
-				// 根据按键确定选区模式
-				const eventMode = getSelectionModeFromEvent(event.nativeEvent)
-				const actualMode = eventMode || currentMode
-
-				const success = magicWandTool.select(pos.x, pos.y, actualMode)
-
-				if (success) {
-					// 获取当前选区用于渲染和状态更新
-					const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-					
-					// 检查是否真的有选区（不是空选区）
-					if (selectionManager.hasSelection() && currentSelection) {
-						setSelection(currentSelection)
-						if (selectionRenderer) {
-							selectionRenderer.renderSelection(currentSelection)
-							const area = selectionManager.getSelectionArea()
-							onSelectionChange(true, area)
-						}
-					} else {
-						// 选区为空，清除状态
-						setSelection(null)
-						if (selectionRenderer) {
-							selectionRenderer.clearSelection()
-						}
-						onSelectionChange(false)
-					}
-				} else {
-					onSelectionChange(false)
-				}
-			} else if (selectedTool === "lasso" && lassoTool) {
-				setIsDrawing(true)
-				lassoTool.startPath(pos.x, pos.y)
-			}
-		}
-
-		const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
-			if (!image || !isDrawing) return
-
-			const pos = getMousePos(event)
-
-			if (selectedTool === "lasso" && lassoTool) {
-				lassoTool.addPoint(pos.x, pos.y)
-			}
-		}
-
-		const handleMouseUp = (event: React.MouseEvent<HTMLCanvasElement>) => {
-			if (selectedTool === "lasso" && lassoTool && isDrawing && selectionManager) {
-				setIsDrawing(false)
-				const mode = getSelectionModeFromEvent(event.nativeEvent) || currentMode
-				const success = lassoTool.finishPath(mode)
-
-				if (success) {
-					// 获取当前选区用于渲染
-					const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-					
-					// 检查是否真的有选区（不是空选区）
-					if (selectionManager.hasSelection() && currentSelection) {
-						setSelection(currentSelection)
-						if (selectionRenderer) {
-							selectionRenderer.renderSelection(currentSelection)
-							const area = selectionManager.getSelectionArea()
-							onSelectionChange(true, area)
-						}
-					} else {
-						// 选区为空，清除状态
-						setSelection(null)
-						if (selectionRenderer) {
-							selectionRenderer.clearSelection()
-						}
-						onSelectionChange(false)
-					}
-				} else {
-					onSelectionChange(false)
-				}
-			}
-		}
+			},
+			[onSelectionChange]
+		)
 
 		const clearSelection = useCallback(() => {
 			if (selectionManager) {
@@ -316,19 +301,19 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 					// 使用Canvas合成模式进行高效的选区删除
 					// 保存当前状态
 					ctx.save()
-					
+
 					// 创建临时路径用于选区遮罩
-					const tempCanvas = document.createElement('canvas')
+					const tempCanvas = document.createElement("canvas")
 					tempCanvas.width = canvas.width
 					tempCanvas.height = canvas.height
-					const tempCtx = tempCanvas.getContext('2d')
-					
+					const tempCtx = tempCanvas.getContext("2d")
+
 					if (tempCtx) {
 						// 将选区绘制到临时画布
 						tempCtx.putImageData(selection, 0, 0)
-						
+
 						// 使用合成模式删除选区
-						ctx.globalCompositeOperation = 'destination-out'
+						ctx.globalCompositeOperation = "destination-out"
 						ctx.drawImage(tempCanvas, 0, 0)
 					} else {
 						// 降级到逐像素操作
@@ -344,7 +329,7 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 						}
 						ctx.putImageData(imageData, 0, 0)
 					}
-					
+
 					// 恢复状态
 					ctx.restore()
 					clearSelection()
@@ -356,7 +341,7 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 			if (selectionManager) {
 				selectionManager.invertSelection()
 				const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-				
+
 				// 检查是否真的有选区（不是空选区）
 				if (selectionManager.hasSelection() && currentSelection) {
 					setSelection(currentSelection)
@@ -380,7 +365,7 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 			if (selectionManager) {
 				selectionManager.selectAll()
 				const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-				
+
 				// 检查是否真的有选区（不是空选区）
 				if (selectionManager.hasSelection() && currentSelection) {
 					setSelection(currentSelection)
@@ -452,50 +437,72 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 					</div>
 				) : (
 					<>
-						<div className="relative inline-block">
+						<div
+							ref={containerRef}
+							className="relative overflow-hidden border border-gray-600 rounded-lg shadow-lg w-[1080] h-[768]"
+						>
 							<canvas
 								ref={canvasRef}
-								className="border border-gray-600 rounded-lg shadow-lg bg-white"
 								style={{
 									imageRendering: "crisp-edges",
+									transform: `translate(${canvasTransform.offsetX}px, ${canvasTransform.offsetY}px) scale(${canvasTransform.zoom})`,
+									transformOrigin: "0 0",
 								}}
 							/>
 							<canvas
 								ref={overlayCanvasRef}
-								className="absolute top-0 left-0 border border-gray-600 rounded-lg shadow-lg bg-transparent pointer-events-auto"
-								onMouseDown={handleMouseDown}
-								onMouseMove={handleMouseMove}
-								onMouseUp={handleMouseUp}
-								onMouseLeave={handleMouseUp}
+								className="absolute top-0 left-0 bg-transparent pointer-events-auto"
+								onMouseDown={combinedMouseDown}
+								onMouseMove={combinedMouseMove}
+								onMouseUp={combinedMouseUp}
+								onMouseLeave={combinedMouseUp}
 								style={{
-									cursor:
-										selectedTool === "magic-wand"
-											? "crosshair"
-											: selectedTool === "lasso"
-											? "crosshair"
-											: "default",
+									cursor: canvasTransform.isDragging
+										? "grabbing"
+										: selectedTool === "move"
+										? "grab"
+										: selectedTool === "magic-wand"
+										? "crosshair"
+										: selectedTool === "lasso"
+										? "crosshair"
+										: "default",
+									transform: `translate(${canvasTransform.offsetX}px, ${canvasTransform.offsetY}px) scale(${canvasTransform.zoom})`,
+									transformOrigin: "0 0",
 								}}
 							/>
 							<canvas
 								ref={lassoPreviewCanvasRef}
-								className="absolute top-0 left-0 border border-gray-600 rounded-lg shadow-lg bg-transparent pointer-events-none"
+								className="absolute top-0 left-0 bg-transparent pointer-events-none"
 								style={{
 									zIndex: 10, // 确保套索预览在最上层
+									transform: `translate(${canvasTransform.offsetX}px, ${canvasTransform.offsetY}px) scale(${canvasTransform.zoom})`,
+									transformOrigin: "0 0",
 								}}
 							/>
 
-							<div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-4 py-3 rounded-lg text-sm max-w-64">
+							<div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white rounded-lg text-sm max-w-64">
 								{selection && <div className="text-xs text-green-400">选区激活 ✨ </div>}
 								{shortcutText && <div className="text-xs text-yellow-400 mt-2">{shortcutText}</div>}
 							</div>
 						</div>
 						{/* 快捷键提示 */}
-						<div className="absolute right-4 top-4 text-xs text-gray-300 border border-gray-600 p-2">
+						<div className="absolute right-4 bottom-4 text-xs text-gray-300 border border-gray-600 p-2">
 							<div className="text-xs text-gray-400 mb-1">快捷键:</div>
 							<div>{shortcuts.add}</div>
 							<div>{shortcuts.subtract}</div>
 							<div>{shortcuts.intersect}</div>
+							<div className="text-xs text-gray-400 mt-2 mb-1">移动工具:</div>
+							<div>拖拽: 移动画布</div>
+							<div>滚轮: 缩放画布</div>
 						</div>
+
+						{/* 缩放控件 */}
+						<ZoomControls
+							zoom={canvasTransform.zoom}
+							onZoomIn={canvasTransform.zoomIn}
+							onZoomOut={canvasTransform.zoomOut}
+							onReset={canvasTransform.resetZoom}
+						/>
 					</>
 				)}
 			</div>
