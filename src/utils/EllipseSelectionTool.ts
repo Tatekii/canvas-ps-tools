@@ -119,7 +119,7 @@ export class EllipseSelectionTool {
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
     tempCanvas.height = height;
-    const tempCtx = tempCanvas.getContext('2d');
+    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
     
     if (!tempCtx) return mask;
 

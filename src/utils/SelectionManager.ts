@@ -73,7 +73,7 @@ export class SelectionManager {
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = this.width;
     tempCanvas.height = this.height;
-    const ctx = tempCanvas.getContext('2d');
+    const ctx = tempCanvas.getContext('2d', { willReadFrequently: true });
     
     if (!ctx) {
       // 降级到手动合并
@@ -90,7 +90,7 @@ export class SelectionManager {
     const tempCanvas2 = document.createElement('canvas');
     tempCanvas2.width = this.width;
     tempCanvas2.height = this.height;
-    const ctx2 = tempCanvas2.getContext('2d');
+    const ctx2 = tempCanvas2.getContext('2d', { willReadFrequently: true });
     
     if (!ctx2) {
       return this.mergeSelectionsManually(existing, newSelection, mode);

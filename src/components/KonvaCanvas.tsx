@@ -8,9 +8,9 @@ import { RectangleSelectionTool } from "../utils/RectangleSelectionTool"
 import { EllipseSelectionTool } from "../utils/EllipseSelectionTool"
 import { SelectionRenderer } from "../utils/SelectionRenderer"
 import { SelectionManager } from "../utils/SelectionManager"
-import { SelectionMode } from "../utils/SelectionTypes"
 import { getShortcutHints } from "../utils/KeyboardUtils"
 import { useSelectionMode } from "../hooks/useSelectionMode"
+import { useKonvaMouseEvent } from "../hooks/useKonvaMouseEvent"
 import { ZoomControls } from "./ZoomControls"
 import { KonvaSelectionOverlay, KonvaSelectionRenderer } from "./KonvaSelectionOverlay"
 import { KonvaToolPreview, PreviewData } from "./KonvaToolPreview"
@@ -130,9 +130,24 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				// 初始化工具
 				const manager = new SelectionManager(width, height)
 				const magicWand = new MagicWandTool(canvas, manager, tolerance)
-				const lasso = new LassoTool(lassoCanvas, manager)
 				
 				// 创建预览回调函数
+				const lassoPreviewCallback = (points: [number, number][], isDrawing: boolean) => {
+					if (isDrawing && points.length > 0) {
+						setPreviewData({
+							type: 'lasso',
+							data: {
+								points,
+								isDrawing
+							}
+						})
+					} else {
+						setPreviewData(null)
+					}
+				}
+				
+				const lasso = new LassoTool(lassoCanvas, manager, lassoPreviewCallback)
+				
 				const rectanglePreviewCallback = (startX: number, startY: number, endX: number, endY: number, isDrawing: boolean) => {
 					if (isDrawing) {
 						setPreviewData({
@@ -234,212 +249,26 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			return { x: Math.floor(pos.x), y: Math.floor(pos.y) }
 		}, [image, getDisplayDimensions])
 
-		// 处理鼠标按下事件
-		const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
-			if (!image || !isCanvasReady) return
-
-			e.evt.preventDefault()
-
-			if (selectedTool === "move") {
-				setIsDragging(true)
-				return
-			}
-
-			const point = getRelativePointerPosition()
-			if (!point) return
-
-			// 根据工具类型处理
-			switch (selectedTool) {
-				case "magic-wand":
-					if (magicWandTool && selectionManager) {
-						// 根据按键确定选区模式
-						const event = e.evt
-						let actualMode = currentMode
-						
-						// 检查修饰键来覆盖模式
-						if (event.shiftKey && (event.ctrlKey || event.metaKey)) {
-							actualMode = SelectionMode.INTERSECT
-						} else if (event.ctrlKey || event.metaKey) {
-							actualMode = SelectionMode.SUBTRACT
-						} else if (event.shiftKey) {
-							actualMode = SelectionMode.ADD
-						}
-
-						const success = magicWandTool.select(point.x, point.y, actualMode)
-
-						if (success) {
-							const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-							
-							if (selectionManager.hasSelection() && currentSelection) {
-								// 根据渲染器类型更新选区显示
-								if (useKonvaRenderer && konvaSelectionRenderer) {
-									konvaSelectionRenderer.renderSelection(currentSelection)
-								} else if (selectionRenderer) {
-									selectionRenderer.renderSelection(currentSelection)
-								}
-								
-								const area = selectionManager.getSelectionArea()
-								onSelectionChange(true, area)
-							} else {
-								setSelection(null)
-								
-								// 清除选区显示
-								if (useKonvaRenderer && konvaSelectionRenderer) {
-									konvaSelectionRenderer.clearSelection()
-								} else if (selectionRenderer) {
-									selectionRenderer.clearSelection()
-								}
-								
-								onSelectionChange(false)
-							}
-						}
-					}
-					break
-
-				case "lasso":
-					if (lassoTool) {
-						lassoTool.startPath(point.x, point.y)
-					}
-					break
-
-				case "rectangle-select":
-					if (rectangleTool) {
-						setIsDrawing(true)
-						rectangleTool.startSelection(point.x, point.y)
-					}
-					break
-
-				case "ellipse-select":
-					if (ellipseTool) {
-						setIsDrawing(true)
-						ellipseTool.startSelection(point.x, point.y)
-					}
-					break
-			}
-		}, [image, isCanvasReady, selectedTool, getRelativePointerPosition, magicWandTool, selectionManager, currentMode, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange, lassoTool, rectangleTool, ellipseTool])
-
-	// 处理鼠标移动事件
-	const handleMouseMove = useCallback(() => {
-		if (!image || !isCanvasReady) return
-
-		if (isDragging && selectedTool === "move") {
-			return // Konva会自动处理拖拽
-		}
-
-		const point = getRelativePointerPosition()
-		if (!point) return
-
-		if (selectedTool === "lasso" && lassoTool) {
-			lassoTool.addPoint(point.x, point.y)
-		} else if (selectedTool === "rectangle-select" && rectangleTool && isDrawing) {
-			rectangleTool.updateSelection(point.x, point.y)
-		} else if (selectedTool === "ellipse-select" && ellipseTool && isDrawing) {
-			ellipseTool.updateSelection(point.x, point.y)
-		}
-	}, [image, isCanvasReady, isDragging, selectedTool, lassoTool, rectangleTool, ellipseTool, isDrawing, getRelativePointerPosition])		// 处理鼠标释放事件
-		const handleMouseUp = useCallback((e: KonvaEventObject<MouseEvent>) => {
-			if (isDragging) {
-				setIsDragging(false)
-				return
-			}
-
-			if (selectedTool === "lasso" && lassoTool && selectionManager) {
-				// 根据按键确定选区模式
-				const event = e.evt
-				let actualMode = currentMode
-				
-				if (event.shiftKey && (event.ctrlKey || event.metaKey)) {
-					actualMode = SelectionMode.INTERSECT
-				} else if (event.ctrlKey || event.metaKey) {
-					actualMode = SelectionMode.SUBTRACT
-				} else if (event.shiftKey) {
-					actualMode = SelectionMode.ADD
-				}
-
-				const success = lassoTool.finishPath(actualMode)
-
-				if (success) {
-					const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-					
-					if (selectionManager.hasSelection() && currentSelection) {
-						// 根据渲染器类型更新选区显示
-						if (useKonvaRenderer && konvaSelectionRenderer) {
-							konvaSelectionRenderer.renderSelection(currentSelection)
-						} else if (selectionRenderer) {
-							selectionRenderer.renderSelection(currentSelection)
-						}
-						
-						const area = selectionManager.getSelectionArea()
-						onSelectionChange(true, area)
-					} else {
-						setSelection(null)
-						
-						// 清除选区显示
-						if (useKonvaRenderer && konvaSelectionRenderer) {
-							konvaSelectionRenderer.clearSelection()
-						} else if (selectionRenderer) {
-							selectionRenderer.clearSelection()
-						}
-						
-						onSelectionChange(false)
-					}
-				}
-			}
-
-			// 处理矩形和椭圆选区工具的结束
-			if ((selectedTool === "rectangle-select" || selectedTool === "ellipse-select") && isDrawing) {
-				setIsDrawing(false)
-				
-				const point = getRelativePointerPosition()
-				if (!point) return
-				
-				// 根据按键确定选区模式
-				const event = e.evt
-				let actualMode = currentMode
-				
-				if (event.shiftKey && (event.ctrlKey || event.metaKey)) {
-					actualMode = SelectionMode.INTERSECT
-				} else if (event.ctrlKey || event.metaKey) {
-					actualMode = SelectionMode.SUBTRACT
-				} else if (event.shiftKey) {
-					actualMode = SelectionMode.ADD
-				}
-
-				let success = false
-				if (selectedTool === "rectangle-select" && rectangleTool) {
-					success = rectangleTool.finishSelection(point.x, point.y, actualMode)
-				} else if (selectedTool === "ellipse-select" && ellipseTool) {
-					success = ellipseTool.finishSelection(point.x, point.y, actualMode)
-				}
-
-				if (success && selectionManager) {
-					const currentSelection = selectionManager.getCurrentSelectionAsImageData()
-					
-					if (selectionManager.hasSelection() && currentSelection) {
-						// 根据渲染器类型更新选区显示
-						if (useKonvaRenderer && konvaSelectionRenderer) {
-							konvaSelectionRenderer.renderSelection(currentSelection)
-						} else if (selectionRenderer) {
-							selectionRenderer.renderSelection(currentSelection)
-						}
-						
-						const area = selectionManager.getSelectionArea()
-						onSelectionChange(true, area)
-					} else {
-						setSelection(null)
-						
-						// 清除选区显示
-						if (useKonvaRenderer && konvaSelectionRenderer) {
-							konvaSelectionRenderer.clearSelection()
-						} else if (selectionRenderer) {
-							selectionRenderer.clearSelection()
-						}
-						
-						onSelectionChange(false)
-					}
-				}
-			}
-		}, [isDragging, selectedTool, lassoTool, rectangleTool, ellipseTool, selectionManager, currentMode, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange, isDrawing, getRelativePointerPosition])
+		// 使用统一的鼠标事件处理Hook
+		const { handleMouseDown, handleMouseMove, handleMouseUp } = useKonvaMouseEvent({
+			selectedTool,
+			image,
+			isCanvasReady,
+			magicWandTool,
+			lassoTool,
+			rectangleTool,
+			ellipseTool,
+			selectionManager,
+			selectionRenderer,
+			konvaSelectionRenderer,
+			useKonvaRenderer,
+			currentMode,
+			onSelectionChange,
+			setSelection,
+			setIsDrawing,
+			setIsDragging,
+			getRelativePointerPosition,
+		})
 
 		// 处理滚轮缩放
 		const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
