@@ -10,6 +10,7 @@ import { SelectionMode } from "../utils/SelectionTypes"
 import { getShortcutHints } from "../utils/KeyboardUtils"
 import { useSelectionMode } from "../hooks/useSelectionMode"
 import { ZoomControls } from "./ZoomControls"
+import { KonvaSelectionOverlay, KonvaSelectionRenderer } from "./KonvaSelectionOverlay"
 
 interface KonvaCanvasRef {
 	clearSelection: () => void
@@ -40,11 +41,13 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 		const [magicWandTool, setMagicWandTool] = useState<MagicWandTool | null>(null)
 		const [lassoTool, setLassoTool] = useState<LassoTool | null>(null)
 		const [selectionRenderer, setSelectionRenderer] = useState<SelectionRenderer | null>(null)
+		const [konvaSelectionRenderer, setKonvaSelectionRenderer] = useState<KonvaSelectionRenderer | null>(null)
 
 		// Konva相关状态
 		const [stageScale, setStageScale] = useState(1)
 		const [stagePosition, setStagePosition] = useState({ x: 0, y: 0 })
 		const [isDragging, setIsDragging] = useState(false)
+		const [useKonvaRenderer, setUseKonvaRenderer] = useState(true) // 默认使用Konva渲染器
 
 		// 使用自定义Hook处理选区模式和键盘事件
 		const { currentMode, shortcutText } = useSelectionMode({
@@ -120,11 +123,17 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				const magicWand = new MagicWandTool(canvas, manager, tolerance)
 				const lasso = new LassoTool(lassoCanvas, manager)
 				const renderer = new SelectionRenderer(overlayCanvas)
+				
+				// 创建Konva选区渲染器
+				const konvaRenderer = new KonvaSelectionRenderer((selection) => {
+					setSelection(selection)
+				})
 
 				setSelectionManager(manager)
 				setMagicWandTool(magicWand)
 				setLassoTool(lasso)
 				setSelectionRenderer(renderer)
+				setKonvaSelectionRenderer(konvaRenderer)
 
 				setIsCanvasReady(true)
 
@@ -211,17 +220,25 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 							const currentSelection = selectionManager.getCurrentSelectionAsImageData()
 							
 							if (selectionManager.hasSelection() && currentSelection) {
-								setSelection(currentSelection)
-								if (selectionRenderer) {
+								// 根据渲染器类型更新选区显示
+								if (useKonvaRenderer && konvaSelectionRenderer) {
+									konvaSelectionRenderer.renderSelection(currentSelection)
+								} else if (selectionRenderer) {
 									selectionRenderer.renderSelection(currentSelection)
-									const area = selectionManager.getSelectionArea()
-									onSelectionChange(true, area)
 								}
+								
+								const area = selectionManager.getSelectionArea()
+								onSelectionChange(true, area)
 							} else {
 								setSelection(null)
-								if (selectionRenderer) {
+								
+								// 清除选区显示
+								if (useKonvaRenderer && konvaSelectionRenderer) {
+									konvaSelectionRenderer.clearSelection()
+								} else if (selectionRenderer) {
 									selectionRenderer.clearSelection()
 								}
+								
 								onSelectionChange(false)
 							}
 						}
@@ -234,7 +251,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 					}
 					break
 			}
-		}, [image, isCanvasReady, selectedTool, getRelativePointerPosition, magicWandTool, selectionManager, currentMode, selectionRenderer, onSelectionChange, lassoTool])
+		}, [image, isCanvasReady, selectedTool, getRelativePointerPosition, magicWandTool, selectionManager, currentMode, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange, lassoTool])
 
 	// 处理鼠标移动事件
 	const handleMouseMove = useCallback(() => {
@@ -276,22 +293,30 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 					const currentSelection = selectionManager.getCurrentSelectionAsImageData()
 					
 					if (selectionManager.hasSelection() && currentSelection) {
-						setSelection(currentSelection)
-						if (selectionRenderer) {
+						// 根据渲染器类型更新选区显示
+						if (useKonvaRenderer && konvaSelectionRenderer) {
+							konvaSelectionRenderer.renderSelection(currentSelection)
+						} else if (selectionRenderer) {
 							selectionRenderer.renderSelection(currentSelection)
-							const area = selectionManager.getSelectionArea()
-							onSelectionChange(true, area)
 						}
+						
+						const area = selectionManager.getSelectionArea()
+						onSelectionChange(true, area)
 					} else {
 						setSelection(null)
-						if (selectionRenderer) {
+						
+						// 清除选区显示
+						if (useKonvaRenderer && konvaSelectionRenderer) {
+							konvaSelectionRenderer.clearSelection()
+						} else if (selectionRenderer) {
 							selectionRenderer.clearSelection()
 						}
+						
 						onSelectionChange(false)
 					}
 				}
 			}
-		}, [isDragging, selectedTool, lassoTool, selectionManager, currentMode, selectionRenderer, onSelectionChange])
+		}, [isDragging, selectedTool, lassoTool, selectionManager, currentMode, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange])
 
 		// 处理滚轮缩放
 		const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
@@ -382,11 +407,16 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				selectionManager.clearSelection()
 			}
 			setSelection(null)
-			if (selectionRenderer) {
+			
+			// 清除选区显示
+			if (useKonvaRenderer && konvaSelectionRenderer) {
+				konvaSelectionRenderer.clearSelection()
+			} else if (selectionRenderer) {
 				selectionRenderer.clearSelection()
 			}
+			
 			onSelectionChange(false)
-		}, [selectionManager, selectionRenderer, onSelectionChange])
+		}, [selectionManager, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange])
 
 		// 删除选中区域
 		const deleteSelected = useCallback(() => {
@@ -425,21 +455,29 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				const currentSelection = selectionManager.getCurrentSelectionAsImageData()
 
 				if (selectionManager.hasSelection() && currentSelection) {
-					setSelection(currentSelection)
-					if (selectionRenderer) {
+					// 根据渲染器类型更新选区显示
+					if (useKonvaRenderer && konvaSelectionRenderer) {
+						konvaSelectionRenderer.renderSelection(currentSelection)
+					} else if (selectionRenderer) {
 						selectionRenderer.renderSelection(currentSelection)
-						const area = selectionManager.getSelectionArea()
-						onSelectionChange(true, area)
 					}
+					
+					const area = selectionManager.getSelectionArea()
+					onSelectionChange(true, area)
 				} else {
 					setSelection(null)
-					if (selectionRenderer) {
+					
+					// 清除选区显示
+					if (useKonvaRenderer && konvaSelectionRenderer) {
+						konvaSelectionRenderer.clearSelection()
+					} else if (selectionRenderer) {
 						selectionRenderer.clearSelection()
 					}
+					
 					onSelectionChange(false)
 				}
 			}
-		}, [selectionManager, selectionRenderer, onSelectionChange])
+		}, [selectionManager, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange])
 
 		// 全选
 		const selectAll = useCallback(() => {
@@ -448,15 +486,18 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				const currentSelection = selectionManager.getCurrentSelectionAsImageData()
 
 				if (selectionManager.hasSelection() && currentSelection) {
-					setSelection(currentSelection)
-					if (selectionRenderer) {
+					// 根据渲染器类型更新选区显示
+					if (useKonvaRenderer && konvaSelectionRenderer) {
+						konvaSelectionRenderer.renderSelection(currentSelection)
+					} else if (selectionRenderer) {
 						selectionRenderer.renderSelection(currentSelection)
-						const area = selectionManager.getSelectionArea()
-						onSelectionChange(true, area)
 					}
+					
+					const area = selectionManager.getSelectionArea()
+					onSelectionChange(true, area)
 				}
 			}
-		}, [selectionManager, selectionRenderer, onSelectionChange])
+		}, [selectionManager, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange])
 
 		// 缩放控制
 		const zoomIn = useCallback(() => {
@@ -576,6 +617,12 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 								/>
 							)}
 						</Layer>
+						{/* 选区层 */}
+						{useKonvaRenderer && (
+							<Layer>
+								<KonvaSelectionOverlay selection={selection} />
+							</Layer>
+						)}
 					</Stage>
 
 					<div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white rounded-lg text-sm max-w-64 p-2">
