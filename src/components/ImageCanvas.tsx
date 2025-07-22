@@ -28,7 +28,6 @@ const ImageCanvas = React.forwardRef<ImageCanvasRef, ImageCanvasProps>(
 		const fileInputRef = useRef<HTMLInputElement>(null)
 		const containerRef = useRef<HTMLDivElement>(null) // 画框容器引用
 
-		// TODO
 		const [isCanvasReady, setIsCanvasReady] = useState<boolean>(false)
 
 		const [image, setImage] = useState<HTMLImageElement | null>(null)

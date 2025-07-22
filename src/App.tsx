@@ -1,6 +1,7 @@
 import { useState, useRef } from "react"
 import Toolbar from "./components/Toolbar"
 import ImageCanvas from "./components/ImageCanvas"
+import KonvaCanvas from "./components/KonvaCanvas"
 import PropertyPanel from "./components/PropertyPanel"
 import { EditTools, EditToolTypes } from "./constants"
 
@@ -18,6 +19,7 @@ function App() {
 	const [selectionArea, setSelectionArea] = useState<number | undefined>()
 	const [undoStack] = useState<string[]>([])
 	const [redoStack] = useState<string[]>([])
+	const [useKonva, setUseKonva] = useState(true) // 开关来选择Canvas类型
 
 	const canvasRef = useRef<ImageCanvasRef>(null)
 
@@ -66,6 +68,16 @@ function App() {
 			<header className="bg-gray-800 border-b border-gray-700 px-6 py-3">
 				<div className="flex items-center justify-between">
 					<h1 className="text-white text-xl font-semibold">canvas-ps-tools</h1>
+					<button
+						onClick={() => setUseKonva(!useKonva)}
+						className={`px-3 py-1 rounded text-sm ${
+							useKonva 
+								? "bg-green-600 text-white" 
+								: "bg-gray-600 text-gray-300"
+						}`}
+					>
+						{useKonva ? "Konva模式" : "Canvas模式"}
+					</button>
 				</div>
 			</header>
 
@@ -85,12 +97,21 @@ function App() {
 					hasSelection={hasSelection}
 				/>
 
-				<ImageCanvas
-					ref={canvasRef}
-					selectedTool={selectedTool}
-					tolerance={tolerance}
-					onSelectionChange={handleSelectionChange}
-				/>
+				{useKonva ? (
+					<KonvaCanvas
+						ref={canvasRef}
+						selectedTool={selectedTool}
+						tolerance={tolerance}
+						onSelectionChange={handleSelectionChange}
+					/>
+				) : (
+					<ImageCanvas
+						ref={canvasRef}
+						selectedTool={selectedTool}
+						tolerance={tolerance}
+						onSelectionChange={handleSelectionChange}
+					/>
+				)}
 
 				<PropertyPanel
 					selectedTool={selectedTool}

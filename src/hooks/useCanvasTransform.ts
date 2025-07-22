@@ -17,10 +17,10 @@ const clampOffset = (offset: number, canvasSize: number, containerSize: number, 
 }
 
 interface UseCanvasTransformProps {
-	canvasRef: React.RefObject<HTMLCanvasElement>
-	overlayCanvasRef: React.RefObject<HTMLCanvasElement>
-	lassoPreviewCanvasRef: React.RefObject<HTMLCanvasElement>
-	containerRef?: React.RefObject<HTMLElement> // 画框容器
+	canvasRef: React.RefObject<HTMLCanvasElement|null>
+	overlayCanvasRef: React.RefObject<HTMLCanvasElement|null>
+	lassoPreviewCanvasRef: React.RefObject<HTMLCanvasElement|null>
+	containerRef?: React.RefObject<HTMLElement|null> // 画框容器
 	selectedTool?: string // 当前选中的工具
 	minZoom?: number
 	maxZoom?: number
