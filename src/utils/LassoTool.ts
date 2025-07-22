@@ -1,15 +1,30 @@
 import { SelectionMode } from './SelectionTypes';
 import { SelectionManager } from './SelectionManager';
 
+// 预览回调类型
+export type LassoPreviewCallback = (points: [number, number][], isDrawing: boolean) => void;
+
 export class LassoTool {
   private canvas: HTMLCanvasElement;
   private path: [number, number][] = [];
   private isDrawing = false;
   private selectionManager: SelectionManager;
+  private previewCallback?: LassoPreviewCallback;
 
-  constructor(canvas: HTMLCanvasElement, selectionManager: SelectionManager) {
+  constructor(canvas: HTMLCanvasElement, selectionManager: SelectionManager, previewCallback?: LassoPreviewCallback) {
     this.canvas = canvas;
     this.selectionManager = selectionManager;
+    this.previewCallback = previewCallback;
+  }
+
+  // 设置预览回调
+  setPreviewCallback(callback: LassoPreviewCallback) {
+    this.previewCallback = callback;
+  }
+
+  // 清除预览回调
+  clearPreviewCallback() {
+    this.previewCallback = undefined;
   }
 
   startPath(x: number, y: number) {
@@ -20,6 +35,7 @@ export class LassoTool {
     this.path = [[clampedX, clampedY]];
     this.isDrawing = true;
     this.drawPath();
+    this.updatePreview();
   }
 
   addPoint(x: number, y: number) {
@@ -37,6 +53,7 @@ export class LassoTool {
     
     this.path.push([clampedX, clampedY]);
     this.drawPath();
+    this.updatePreview();
   }
 
   finishPath(mode: SelectionMode = SelectionMode.NEW): boolean {
@@ -46,6 +63,7 @@ export class LassoTool {
     }
 
     this.isDrawing = false;
+    this.updatePreview(); // 更新预览状态为非绘制中
     const mask = this.createSelectionMask();
     this.selectionManager.applySelection(mask, mode);
     this.clearPath();
@@ -134,6 +152,13 @@ export class LassoTool {
     return mask;
   }
 
+  // 更新预览回调
+  private updatePreview() {
+    if (this.previewCallback) {
+      this.previewCallback([...this.path], this.isDrawing);
+    }
+  }
+
   private clearPath() {
     const ctx = this.canvas.getContext('2d');
     if (ctx) {
@@ -141,5 +166,6 @@ export class LassoTool {
     }
     this.path = [];
     this.isDrawing = false;
+    this.updatePreview(); // 清除预览
   }
 }

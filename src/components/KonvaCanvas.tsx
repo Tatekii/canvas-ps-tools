@@ -1,9 +1,11 @@
 import React, { useRef, useEffect, useState, useCallback } from "react"
-import { Stage, Layer, Image as KonvaImage, Rect } from "react-konva"
+import { Stage, Layer, Image as KonvaImage } from "react-konva"
 import { KonvaEventObject } from "konva/lib/Node"
 import Konva from "konva"
 import { MagicWandTool } from "../utils/MagicWandTool"
 import { LassoTool } from "../utils/LassoTool"
+import { RectangleSelectionTool } from "../utils/RectangleSelectionTool"
+import { EllipseSelectionTool } from "../utils/EllipseSelectionTool"
 import { SelectionRenderer } from "../utils/SelectionRenderer"
 import { SelectionManager } from "../utils/SelectionManager"
 import { SelectionMode } from "../utils/SelectionTypes"
@@ -11,6 +13,7 @@ import { getShortcutHints } from "../utils/KeyboardUtils"
 import { useSelectionMode } from "../hooks/useSelectionMode"
 import { ZoomControls } from "./ZoomControls"
 import { KonvaSelectionOverlay, KonvaSelectionRenderer } from "./KonvaSelectionOverlay"
+import { KonvaToolPreview, PreviewData } from "./KonvaToolPreview"
 
 interface KonvaCanvasRef {
 	clearSelection: () => void
@@ -40,8 +43,14 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 		const [selectionManager, setSelectionManager] = useState<SelectionManager | null>(null)
 		const [magicWandTool, setMagicWandTool] = useState<MagicWandTool | null>(null)
 		const [lassoTool, setLassoTool] = useState<LassoTool | null>(null)
+		const [rectangleTool, setRectangleTool] = useState<RectangleSelectionTool | null>(null)
+		const [ellipseTool, setEllipseTool] = useState<EllipseSelectionTool | null>(null)
 		const [selectionRenderer, setSelectionRenderer] = useState<SelectionRenderer | null>(null)
 		const [konvaSelectionRenderer, setKonvaSelectionRenderer] = useState<KonvaSelectionRenderer | null>(null)
+
+		// 工具预览状态
+		const [previewData, setPreviewData] = useState<PreviewData | null>(null)
+		const [isDrawing, setIsDrawing] = useState(false)
 
 		// Konva相关状态
 		const [stageScale, setStageScale] = useState(1)
@@ -122,6 +131,46 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				const manager = new SelectionManager(width, height)
 				const magicWand = new MagicWandTool(canvas, manager, tolerance)
 				const lasso = new LassoTool(lassoCanvas, manager)
+				
+				// 创建预览回调函数
+				const rectanglePreviewCallback = (startX: number, startY: number, endX: number, endY: number, isDrawing: boolean) => {
+					if (isDrawing) {
+						setPreviewData({
+							type: 'rectangle',
+							data: {
+								startX,
+								startY,
+								endX,
+								endY,
+								isDrawing
+							}
+						})
+					} else {
+						setPreviewData(null)
+					}
+				}
+				
+				const ellipsePreviewCallback = (centerX: number, centerY: number, radiusX: number, radiusY: number, isDrawing: boolean) => {
+					if (isDrawing) {
+						setPreviewData({
+							type: 'ellipse',
+							data: {
+								centerX,
+								centerY,
+								radiusX,
+								radiusY,
+								isDrawing
+							}
+						})
+					} else {
+						setPreviewData(null)
+					}
+				}
+				
+				// 初始化新的选区工具
+				const rectangle = new RectangleSelectionTool(canvas, manager, rectanglePreviewCallback)
+				const ellipse = new EllipseSelectionTool(canvas, manager, ellipsePreviewCallback)
+				
 				const renderer = new SelectionRenderer(overlayCanvas)
 				
 				// 创建Konva选区渲染器
@@ -132,6 +181,8 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				setSelectionManager(manager)
 				setMagicWandTool(magicWand)
 				setLassoTool(lasso)
+				setRectangleTool(rectangle)
+				setEllipseTool(ellipse)
 				setSelectionRenderer(renderer)
 				setKonvaSelectionRenderer(konvaRenderer)
 
@@ -250,8 +301,22 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 						lassoTool.startPath(point.x, point.y)
 					}
 					break
+
+				case "rectangle-select":
+					if (rectangleTool) {
+						setIsDrawing(true)
+						rectangleTool.startSelection(point.x, point.y)
+					}
+					break
+
+				case "ellipse-select":
+					if (ellipseTool) {
+						setIsDrawing(true)
+						ellipseTool.startSelection(point.x, point.y)
+					}
+					break
 			}
-		}, [image, isCanvasReady, selectedTool, getRelativePointerPosition, magicWandTool, selectionManager, currentMode, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange, lassoTool])
+		}, [image, isCanvasReady, selectedTool, getRelativePointerPosition, magicWandTool, selectionManager, currentMode, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange, lassoTool, rectangleTool, ellipseTool])
 
 	// 处理鼠标移动事件
 	const handleMouseMove = useCallback(() => {
@@ -261,13 +326,17 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			return // Konva会自动处理拖拽
 		}
 
+		const point = getRelativePointerPosition()
+		if (!point) return
+
 		if (selectedTool === "lasso" && lassoTool) {
-			const point = getRelativePointerPosition()
-			if (point) {
-				lassoTool.addPoint(point.x, point.y)
-			}
+			lassoTool.addPoint(point.x, point.y)
+		} else if (selectedTool === "rectangle-select" && rectangleTool && isDrawing) {
+			rectangleTool.updateSelection(point.x, point.y)
+		} else if (selectedTool === "ellipse-select" && ellipseTool && isDrawing) {
+			ellipseTool.updateSelection(point.x, point.y)
 		}
-	}, [image, isCanvasReady, isDragging, selectedTool, lassoTool, getRelativePointerPosition])		// 处理鼠标释放事件
+	}, [image, isCanvasReady, isDragging, selectedTool, lassoTool, rectangleTool, ellipseTool, isDrawing, getRelativePointerPosition])		// 处理鼠标释放事件
 		const handleMouseUp = useCallback((e: KonvaEventObject<MouseEvent>) => {
 			if (isDragging) {
 				setIsDragging(false)
@@ -316,7 +385,61 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 					}
 				}
 			}
-		}, [isDragging, selectedTool, lassoTool, selectionManager, currentMode, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange])
+
+			// 处理矩形和椭圆选区工具的结束
+			if ((selectedTool === "rectangle-select" || selectedTool === "ellipse-select") && isDrawing) {
+				setIsDrawing(false)
+				
+				const point = getRelativePointerPosition()
+				if (!point) return
+				
+				// 根据按键确定选区模式
+				const event = e.evt
+				let actualMode = currentMode
+				
+				if (event.shiftKey && (event.ctrlKey || event.metaKey)) {
+					actualMode = SelectionMode.INTERSECT
+				} else if (event.ctrlKey || event.metaKey) {
+					actualMode = SelectionMode.SUBTRACT
+				} else if (event.shiftKey) {
+					actualMode = SelectionMode.ADD
+				}
+
+				let success = false
+				if (selectedTool === "rectangle-select" && rectangleTool) {
+					success = rectangleTool.finishSelection(point.x, point.y, actualMode)
+				} else if (selectedTool === "ellipse-select" && ellipseTool) {
+					success = ellipseTool.finishSelection(point.x, point.y, actualMode)
+				}
+
+				if (success && selectionManager) {
+					const currentSelection = selectionManager.getCurrentSelectionAsImageData()
+					
+					if (selectionManager.hasSelection() && currentSelection) {
+						// 根据渲染器类型更新选区显示
+						if (useKonvaRenderer && konvaSelectionRenderer) {
+							konvaSelectionRenderer.renderSelection(currentSelection)
+						} else if (selectionRenderer) {
+							selectionRenderer.renderSelection(currentSelection)
+						}
+						
+						const area = selectionManager.getSelectionArea()
+						onSelectionChange(true, area)
+					} else {
+						setSelection(null)
+						
+						// 清除选区显示
+						if (useKonvaRenderer && konvaSelectionRenderer) {
+							konvaSelectionRenderer.clearSelection()
+						} else if (selectionRenderer) {
+							selectionRenderer.clearSelection()
+						}
+						
+						onSelectionChange(false)
+					}
+				}
+			}
+		}, [isDragging, selectedTool, lassoTool, rectangleTool, ellipseTool, selectionManager, currentMode, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, onSelectionChange, isDrawing, getRelativePointerPosition])
 
 		// 处理滚轮缩放
 		const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
@@ -621,6 +744,12 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 						{useKonvaRenderer && (
 							<Layer>
 								<KonvaSelectionOverlay selection={selection} />
+							</Layer>
+						)}
+						{/* 工具预览层 */}
+						{previewData && (
+							<Layer>
+								<KonvaToolPreview previewData={previewData} />
 							</Layer>
 						)}
 					</Stage>
