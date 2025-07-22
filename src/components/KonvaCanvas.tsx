@@ -305,6 +305,29 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			setStagePosition(newPos)
 		}, [])
 
+		// 加载默认测试图片
+		const loadDefaultImage = useCallback(() => {
+			const img = new Image()
+			img.onload = () => {
+				if (img.complete && img.naturalWidth > 0) {
+					setImage(img)
+					setSelection(null)
+					onSelectionChange(false)
+					// 重置舞台缩放并居中
+					setStageScale(1)
+					const { width, height } = getDisplayDimensions(img)
+					const centeredPos = getCenteredPosition(width, height)
+					setStagePosition(centeredPos)
+				} else {
+					alert("默认图片加载失败")
+				}
+			}
+			img.onerror = () => {
+				alert("默认图片加载失败，请检查文件是否存在")
+			}
+			img.src = "/test.png" // Vite会自动从public文件夹提供静态文件
+		}, [onSelectionChange, getDisplayDimensions, getCenteredPosition])
+
 		const handleImageUpload = useCallback(
 			(event: React.ChangeEvent<HTMLInputElement>) => {
 				const file = event.target.files?.[0]
@@ -518,12 +541,23 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 								<p className="text-sm mt-2">支持 PNG, JPG, GIF 格式</p>
 								<p className="text-sm mt-2">不超过10MB</p>
 							</div>
-							<button
-								onClick={() => fileInputRef.current?.click()}
-								className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors duration-200"
-							>
-								选择图片
-							</button>
+							<div className="flex flex-col gap-3">
+								<button
+									onClick={() => fileInputRef.current?.click()}
+									className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors duration-200"
+								>
+									选择图片
+								</button>
+								<div className="text-center">
+									<span className="text-gray-500 text-sm">或者</span>
+								</div>
+								<button
+									onClick={loadDefaultImage}
+									className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors duration-200"
+								>
+									使用测试图片 (test.png)
+								</button>
+							</div>
 						</div>
 						<input
 							ref={fileInputRef}
