@@ -6,7 +6,6 @@ import { RectangleSelectionTool } from "../utils/RectangleSelectionTool"
 import { EllipseSelectionTool } from "../utils/EllipseSelectionTool"
 import { BrushSelectionTool } from "../utils/BrushSelectionTool"
 import { SelectionManager } from "../utils/SelectionManager"
-import { SelectionRenderer } from "../utils/SelectionRenderer"
 import { KonvaSelectionRenderer } from "../components/KonvaSelectionOverlay"
 import { SelectionMode } from "../utils/SelectionTypes"
 import { useKonvaMagicWandHandler } from "./useKonvaMagicWandHandler"
@@ -26,9 +25,7 @@ interface UseKonvaMouseEventProps {
 	ellipseTool: EllipseSelectionTool | null
 	brushTool: BrushSelectionTool | null
 	selectionManager: SelectionManager | null
-	selectionRenderer: SelectionRenderer | null
 	konvaSelectionRenderer: KonvaSelectionRenderer | null
-	useKonvaRenderer: boolean
 	currentMode: SelectionMode
 	onSelectionChange: (hasSelection: boolean, area?: number) => void
 	setSelection: (selection: ImageData | null) => void
@@ -62,9 +59,7 @@ export function useKonvaMouseEvent({
 	ellipseTool,
 	brushTool,
 	selectionManager,
-	selectionRenderer,
 	konvaSelectionRenderer,
-	useKonvaRenderer,
 	currentMode,
 	onSelectionChange,
 	setSelection,
@@ -76,9 +71,7 @@ export function useKonvaMouseEvent({
 	const magicWandHandler = useKonvaMagicWandHandler({
 		magicWandTool,
 		selectionManager,
-		selectionRenderer,
 		konvaSelectionRenderer,
-		useKonvaRenderer,
 		currentMode,
 		onSelectionChange,
 		setSelection,
@@ -89,9 +82,7 @@ export function useKonvaMouseEvent({
 	const lassoHandler = useKonvaLassoHandler({
 		lassoTool,
 		selectionManager,
-		selectionRenderer,
 		konvaSelectionRenderer,
-		useKonvaRenderer,
 		currentMode,
 		onSelectionChange,
 		setSelection,
@@ -102,9 +93,7 @@ export function useKonvaMouseEvent({
 	const rectangleHandler = useKonvaRectangleHandler({
 		rectangleTool,
 		selectionManager,
-		selectionRenderer,
 		konvaSelectionRenderer,
-		useKonvaRenderer,
 		currentMode,
 		onSelectionChange,
 		setSelection,
@@ -115,9 +104,7 @@ export function useKonvaMouseEvent({
 	const ellipseHandler = useKonvaEllipseHandler({
 		ellipseTool,
 		selectionManager,
-		selectionRenderer,
 		konvaSelectionRenderer,
-		useKonvaRenderer,
 		currentMode,
 		onSelectionChange,
 		setSelection,
@@ -128,9 +115,7 @@ export function useKonvaMouseEvent({
 	const brushHandler = useKonvaBrushHandler({
 		brushTool,
 		selectionManager,
-		selectionRenderer,
 		konvaSelectionRenderer,
-		useKonvaRenderer,
 		currentMode,
 		onSelectionChange,
 		setSelection,

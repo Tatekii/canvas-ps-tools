@@ -1,7 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { BrushSelectionTool } from '../utils/BrushSelectionTool'
 import { SelectionManager } from '../utils/SelectionManager'
-import { SelectionRenderer } from '../utils/SelectionRenderer'
 import { KonvaSelectionRenderer } from '../components/KonvaSelectionOverlay'
 import { getSelectionModeFromEvent } from '../utils/KeyboardUtils'
 import { SelectionMode } from '../utils/SelectionTypes'
@@ -9,9 +8,7 @@ import { SelectionMode } from '../utils/SelectionTypes'
 interface UseKonvaBrushHandlerProps {
   brushTool: BrushSelectionTool | null
   selectionManager: SelectionManager | null
-  selectionRenderer: SelectionRenderer | null
   konvaSelectionRenderer: KonvaSelectionRenderer | null
-  useKonvaRenderer: boolean
   currentMode: SelectionMode
   onSelectionChange: (hasSelection: boolean, area?: number) => void
   setSelection: (selection: ImageData | null) => void
@@ -37,9 +34,7 @@ interface UseKonvaBrushHandlerReturn {
 export function useKonvaBrushHandler({
   brushTool,
   selectionManager,
-  selectionRenderer,
   konvaSelectionRenderer,
-  useKonvaRenderer,
   currentMode,
   onSelectionChange,
   setSelection,
@@ -77,11 +72,9 @@ export function useKonvaBrushHandler({
       if (selectionManager.hasSelection() && currentSelection) {
         setSelection(currentSelection)
         
-        // 根据渲染器类型更新选区显示
-        if (useKonvaRenderer && konvaSelectionRenderer) {
+        // 使用Konva渲染器更新选区显示
+        if (konvaSelectionRenderer) {
           konvaSelectionRenderer.renderSelection(currentSelection)
-        } else if (selectionRenderer) {
-          selectionRenderer.renderSelection(currentSelection)
         }
         
         const area = selectionManager.getSelectionArea()
@@ -91,10 +84,8 @@ export function useKonvaBrushHandler({
         setSelection(null)
         
         // 清除选区显示
-        if (useKonvaRenderer && konvaSelectionRenderer) {
+        if (konvaSelectionRenderer) {
           konvaSelectionRenderer.clearSelection()
-        } else if (selectionRenderer) {
-          selectionRenderer.clearSelection()
         }
         
         onSelectionChange(false)
@@ -102,7 +93,7 @@ export function useKonvaBrushHandler({
     } else {
       onSelectionChange(false)
     }
-  }, [enabled, brushTool, selectionManager, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, currentMode, onSelectionChange, setSelection])
+  }, [enabled, brushTool, selectionManager, konvaSelectionRenderer, currentMode, onSelectionChange, setSelection])
 
   return {
     handleMouseDown,

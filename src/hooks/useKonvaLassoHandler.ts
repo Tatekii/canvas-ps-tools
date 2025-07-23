@@ -1,7 +1,6 @@
 import { useCallback } from 'react'
 import { LassoTool } from '../utils/LassoTool'
 import { SelectionManager } from '../utils/SelectionManager'
-import { SelectionRenderer } from '../utils/SelectionRenderer'
 import { KonvaSelectionRenderer } from '../components/KonvaSelectionOverlay'
 import { getSelectionModeFromEvent } from '../utils/KeyboardUtils'
 import { SelectionMode } from '../utils/SelectionTypes'
@@ -9,9 +8,7 @@ import { SelectionMode } from '../utils/SelectionTypes'
 interface UseKonvaLassoHandlerProps {
   lassoTool: LassoTool | null
   selectionManager: SelectionManager | null
-  selectionRenderer: SelectionRenderer | null
   konvaSelectionRenderer: KonvaSelectionRenderer | null
-  useKonvaRenderer: boolean
   currentMode: SelectionMode
   onSelectionChange: (hasSelection: boolean, area?: number) => void
   setSelection: (selection: ImageData | null) => void
@@ -36,9 +33,7 @@ interface UseKonvaLassoHandlerReturn {
 export function useKonvaLassoHandler({
   lassoTool,
   selectionManager,
-  selectionRenderer,
   konvaSelectionRenderer,
-  useKonvaRenderer,
   currentMode,
   onSelectionChange,
   setSelection,
@@ -73,10 +68,8 @@ export function useKonvaLassoHandler({
         setSelection(currentSelection)
         
         // 根据渲染器类型更新选区显示
-        if (useKonvaRenderer && konvaSelectionRenderer) {
+        if ( konvaSelectionRenderer) {
           konvaSelectionRenderer.renderSelection(currentSelection)
-        } else if (selectionRenderer) {
-          selectionRenderer.renderSelection(currentSelection)
         }
         
         const area = selectionManager.getSelectionArea()
@@ -86,18 +79,16 @@ export function useKonvaLassoHandler({
         setSelection(null)
         
         // 清除选区显示
-        if (useKonvaRenderer && konvaSelectionRenderer) {
+        if (konvaSelectionRenderer) {
           konvaSelectionRenderer.clearSelection()
-        } else if (selectionRenderer) {
-          selectionRenderer.clearSelection()
-        }
+        } 
         
         onSelectionChange(false)
       }
     } else {
       onSelectionChange(false)
     }
-  }, [enabled, lassoTool, selectionManager, selectionRenderer, konvaSelectionRenderer, useKonvaRenderer, currentMode, onSelectionChange, setSelection])
+  }, [enabled, lassoTool, selectionManager, konvaSelectionRenderer, currentMode, onSelectionChange, setSelection])
 
   return {
     handleMouseDown,
