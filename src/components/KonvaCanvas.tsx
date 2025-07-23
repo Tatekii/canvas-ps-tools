@@ -9,6 +9,7 @@ import { EllipseSelectionTool } from "../utils/EllipseSelectionTool"
 import { BrushSelectionTool } from "../utils/BrushSelectionTool"
 import { SelectionManager } from "../utils/SelectionManager"
 import { getShortcutHints } from "../utils/KeyboardUtils"
+import { getDisplayDimensions, getCenteredPosition } from "../utils/TransformUtils"
 import { useSelectionMode } from "../hooks/useSelectionMode"
 import { useKonvaMouseEvent } from "../hooks/useKonvaMouseEvent"
 import { ZoomControls } from "./ZoomControls"
@@ -31,6 +32,12 @@ interface KonvaCanvasProps {
 
 const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 	({ selectedTool, tolerance, onSelectionChange }, ref) => {
+		// 舞台尺寸常量
+		const STAGE_WIDTH = 1080
+		const STAGE_HEIGHT = 768
+		const MAX_IMAGE_WIDTH = 1080
+		const MAX_IMAGE_HEIGHT = 720
+
 		const stageRef = useRef<Konva.Stage>(null)
 		const fileInputRef = useRef<HTMLInputElement>(null)
 		const containerRef = useRef<HTMLDivElement>(null)
@@ -58,7 +65,9 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 		const [stagePosition, setStagePosition] = useState({ x: 0, y: 0 })
 		const [isDragging, setIsDragging] = useState(false)
 
-		// 使用自定义Hook处理选区模式和键盘事件
+		// 缓存计算结果
+		const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null)
+		const [centeredPosition, setCenteredPosition] = useState<{ x: number; y: number } | null>(null) // 使用自定义Hook处理选区模式和键盘事件
 		const { currentMode, shortcutText } = useSelectionMode({
 			selectedTool,
 			hasImage: !!image,
@@ -68,140 +77,131 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 		// 获取快捷键提示
 		const shortcuts = getShortcutHints()
 
-		// 计算图片显示尺寸
-		const getDisplayDimensions = useCallback((img: HTMLImageElement) => {
-			const maxWidth = 1080
-			const maxHeight = 720
-			let { naturalWidth: width, naturalHeight: height } = img
+		// 缓存图片尺寸计算
+		useEffect(() => {
+			if (image && image.complete && image.naturalWidth > 0) {
+				const dimensions = getDisplayDimensions(image, MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT)
+				const centered = getCenteredPosition(dimensions.width, dimensions.height, STAGE_WIDTH, STAGE_HEIGHT)
 
-			if (width > maxWidth || height > maxHeight) {
-				const ratio = Math.min(maxWidth / width, maxHeight / height)
-				width *= ratio
-				height *= ratio
+				setImageDimensions(dimensions)
+				setCenteredPosition(centered)
+			} else {
+				setImageDimensions(null)
+				setCenteredPosition(null)
 			}
-
-			return { width, height }
-		}, [])
-
-		// 计算图片居中位置
-		const getCenteredPosition = useCallback((imgWidth: number, imgHeight: number) => {
-			const stageWidth = 1080
-			const stageHeight = 768
-			return {
-				x: (stageWidth - imgWidth) / 2,
-				y: (stageHeight - imgHeight) / 2
-			}
-		}, [])
+		}, [image, MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT, STAGE_WIDTH, STAGE_HEIGHT])
 
 		// 创建隐藏canvas用于工具集成
 		useEffect(() => {
-			if (image && image.complete && image.naturalWidth > 0) {
-				const { width, height } = getDisplayDimensions(image)
+			if (image && image.complete && image.naturalWidth > 0 && imageDimensions && centeredPosition) {
+				const { width, height } = imageDimensions
 
 				// 创建隐藏的canvas用于图像数据和工具处理
-				const canvas = document.createElement('canvas')
+				const canvas = document.createElement("canvas")
 				canvas.width = width
 				canvas.height = height
-				const ctx = canvas.getContext('2d')
-				
+				const ctx = canvas.getContext("2d")
+
 				if (ctx) {
 					// 设置白色背景
-					ctx.fillStyle = 'white'
+					ctx.fillStyle = "white"
 					ctx.fillRect(0, 0, width, height)
-					
+
 					// 绘制图像
 					ctx.imageSmoothingEnabled = true
-					ctx.imageSmoothingQuality = 'high'
+					ctx.imageSmoothingQuality = "high"
 					ctx.drawImage(image, 0, 0, width, height)
 				}
-
-				// 创建选区渲染用的overlay canvas
-				const overlayCanvas = document.createElement('canvas')
-				overlayCanvas.width = width
-				overlayCanvas.height = height
-
-				// 创建套索预览用的canvas
-				const lassoCanvas = document.createElement('canvas')
-				lassoCanvas.width = width
-				lassoCanvas.height = height
 
 				setHiddenCanvas(canvas)
 
 				// 初始化工具
 				const manager = new SelectionManager(width, height)
 				const magicWand = new MagicWandTool(canvas, manager, tolerance)
-				
+
 				// 创建预览回调函数
 				const lassoPreviewCallback = (points: [number, number][], isDrawing: boolean) => {
 					if (isDrawing && points.length > 0) {
 						setPreviewData({
-							type: 'lasso',
+							type: "lasso",
 							data: {
 								points,
-								isDrawing
-							}
+								isDrawing,
+							},
 						})
 					} else {
 						setPreviewData(null)
 					}
 				}
-				
-				const lasso = new LassoTool(lassoCanvas, manager, lassoPreviewCallback)
-				
-				const rectanglePreviewCallback = (startX: number, startY: number, endX: number, endY: number, isDrawing: boolean) => {
+
+				const lasso = new LassoTool(canvas, manager, lassoPreviewCallback)
+
+				const rectanglePreviewCallback = (
+					startX: number,
+					startY: number,
+					endX: number,
+					endY: number,
+					isDrawing: boolean
+				) => {
 					if (isDrawing) {
 						setPreviewData({
-							type: 'rectangle',
+							type: "rectangle",
 							data: {
 								startX,
 								startY,
 								endX,
 								endY,
-								isDrawing
-							}
+								isDrawing,
+							},
 						})
 					} else {
 						setPreviewData(null)
 					}
 				}
-				
-				const ellipsePreviewCallback = (centerX: number, centerY: number, radiusX: number, radiusY: number, isDrawing: boolean) => {
+
+				const ellipsePreviewCallback = (
+					centerX: number,
+					centerY: number,
+					radiusX: number,
+					radiusY: number,
+					isDrawing: boolean
+				) => {
 					if (isDrawing) {
 						setPreviewData({
-							type: 'ellipse',
+							type: "ellipse",
 							data: {
 								centerX,
 								centerY,
 								radiusX,
 								radiusY,
-								isDrawing
-							}
+								isDrawing,
+							},
 						})
 					} else {
 						setPreviewData(null)
 					}
 				}
-				
+
 				const brushPreviewCallback = (points: [number, number][], brushSize: number, isDrawing: boolean) => {
 					if (isDrawing) {
 						setPreviewData({
-							type: 'brush',
+							type: "brush",
 							data: {
 								points,
 								brushSize,
-								isDrawing
-							}
+								isDrawing,
+							},
 						})
 					} else {
 						setPreviewData(null)
 					}
 				}
-				
+
 				// 初始化新的选区工具
 				const rectangle = new RectangleSelectionTool(canvas, manager, rectanglePreviewCallback)
 				const ellipse = new EllipseSelectionTool(canvas, manager, ellipsePreviewCallback)
 				const brush = new BrushSelectionTool(canvas, manager, brushPreviewCallback)
-				
+
 				// 创建Konva选区渲染器
 				const konvaRenderer = new KonvaSelectionRenderer((selection) => {
 					setSelection(selection)
@@ -218,19 +218,18 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				setIsCanvasReady(true)
 
 				// 设置图片居中位置
-				const centeredPos = getCenteredPosition(width, height)
-				setStagePosition(centeredPos)
+				setStagePosition(centeredPosition)
 				if (stageRef.current) {
-					stageRef.current.position(centeredPos)
+					stageRef.current.position(centeredPosition)
 				}
 
-				console.log('Konva Canvas: 工具初始化完成', {
+				console.log("Konva Canvas: 工具初始化完成", {
 					canvasSize: `${width}x${height}`,
 					imageSize: `${image.naturalWidth}x${image.naturalHeight}`,
-					centeredPosition: centeredPos,
+					centeredPosition: centeredPosition,
 				})
 			}
-		}, [image, tolerance, getDisplayDimensions, getCenteredPosition])
+		}, [image, tolerance, imageDimensions, centeredPosition])
 
 		// 处理容差变化
 		useEffect(() => {
@@ -239,30 +238,6 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			}
 		}, [tolerance, magicWandTool])
 
-		// 获取相对于图像的坐标点
-		const getRelativePointerPosition = useCallback(() => {
-			if (!stageRef.current || !image) return null
-
-			const stage = stageRef.current
-			const pointerPosition = stage.getPointerPosition()
-			
-			if (!pointerPosition) return null
-
-			// 考虑stage的变换
-			const transform = stage.getAbsoluteTransform().copy()
-			transform.invert()
-			const pos = transform.point(pointerPosition)
-
-			const { width, height } = getDisplayDimensions(image)
-
-			// 确保坐标在图像范围内
-			if (pos.x < 0 || pos.x >= width || pos.y < 0 || pos.y >= height) {
-				return null
-			}
-
-			return { x: Math.floor(pos.x), y: Math.floor(pos.y) }
-		}, [image, getDisplayDimensions])
-
 		// 使用统一的鼠标事件处理Hook
 		const { handleMouseDown, handleMouseMove, handleMouseUp } = useKonvaMouseEvent({
 			selectedTool,
@@ -270,7 +245,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			isCanvasReady,
 			magicWandTool,
 			lassoTool,
-			rectangleTool, 
+			rectangleTool,
 			ellipseTool,
 			brushTool,
 			selectionManager,
@@ -280,7 +255,9 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			setSelection,
 			setIsDrawing,
 			setIsDragging,
-			getRelativePointerPosition,
+			stageRef,
+			maxWidth: MAX_IMAGE_WIDTH,
+			maxHeight: MAX_IMAGE_HEIGHT,
 		})
 
 		// 处理滚轮缩放
@@ -326,11 +303,8 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 					setImage(img)
 					setSelection(null)
 					onSelectionChange(false)
-					// 重置舞台缩放并居中
+					// 重置舞台缩放，居中位置会在 useEffect 中自动计算和设置
 					setStageScale(1)
-					const { width, height } = getDisplayDimensions(img)
-					const centeredPos = getCenteredPosition(width, height)
-					setStagePosition(centeredPos)
 				} else {
 					alert("默认图片加载失败")
 				}
@@ -339,7 +313,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				alert("默认图片加载失败，请检查文件是否存在")
 			}
 			img.src = "/test.png" // Vite会自动从public文件夹提供静态文件
-		}, [onSelectionChange, getDisplayDimensions, getCenteredPosition])
+		}, [onSelectionChange])
 
 		const handleImageUpload = useCallback(
 			(event: React.ChangeEvent<HTMLInputElement>) => {
@@ -366,11 +340,8 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 								setImage(img)
 								setSelection(null)
 								onSelectionChange(false)
-								// 重置舞台缩放并居中
+								// 重置舞台缩放，居中位置会在 useEffect 中自动计算和设置
 								setStageScale(1)
-								const { width, height } = getDisplayDimensions(img)
-								const centeredPos = getCenteredPosition(width, height)
-								setStagePosition(centeredPos)
 							} else {
 								alert("图片加载失败，请尝试其他图片")
 							}
@@ -386,7 +357,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 					reader.readAsDataURL(file)
 				}
 			},
-			[onSelectionChange, getDisplayDimensions, getCenteredPosition]
+			[onSelectionChange]
 		)
 
 		// 清除选区
@@ -395,12 +366,12 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				selectionManager.clearSelection()
 			}
 			setSelection(null)
-			
+
 			// 清除选区显示
 			if (konvaSelectionRenderer) {
 				konvaSelectionRenderer.clearSelection()
 			}
-			
+
 			onSelectionChange(false)
 		}, [selectionManager, konvaSelectionRenderer, onSelectionChange])
 
@@ -426,7 +397,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 
 				ctx.restore()
 				clearSelection()
-				
+
 				// 强制重新渲染stage
 				if (stageRef.current) {
 					stageRef.current.batchDraw()
@@ -445,17 +416,17 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 					if (konvaSelectionRenderer) {
 						konvaSelectionRenderer.renderSelection(currentSelection)
 					}
-					
+
 					const area = selectionManager.getSelectionArea()
 					onSelectionChange(true, area)
 				} else {
 					setSelection(null)
-					
+
 					// 清除选区显示
 					if (konvaSelectionRenderer) {
 						konvaSelectionRenderer.clearSelection()
 					}
-					
+
 					onSelectionChange(false)
 				}
 			}
@@ -472,7 +443,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 					if (konvaSelectionRenderer) {
 						konvaSelectionRenderer.renderSelection(currentSelection)
 					}
-					
+
 					const area = selectionManager.getSelectionArea()
 					onSelectionChange(true, area)
 				}
@@ -500,16 +471,13 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 
 		const resetZoom = useCallback(() => {
 			const stage = stageRef.current
-			if (!stage || !image) return
-
-			const { width, height } = getDisplayDimensions(image)
-			const centeredPos = getCenteredPosition(width, height)
+			if (!stage || !image || !centeredPosition) return
 
 			stage.scale({ x: 1, y: 1 })
-			stage.position(centeredPos)
+			stage.position(centeredPosition)
 			setStageScale(1)
-			setStagePosition(centeredPos)
-		}, [image, getDisplayDimensions, getCenteredPosition])
+			setStagePosition(centeredPosition)
+		}, [image, centeredPosition])
 
 		// 暴露方法给父组件
 		React.useImperativeHandle(
@@ -523,7 +491,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			[clearSelection, deleteSelected, invertSelection, selectAll]
 		)
 
-		if (!image) {
+		if (!image || !imageDimensions) {
 			return (
 				<div className="flex-1 bg-gray-800 p-4 flex flex-col items-center justify-center relative">
 					<div className="text-center">
@@ -576,7 +544,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			)
 		}
 
-		const { width, height } = getDisplayDimensions(image)
+		const { width, height } = imageDimensions
 
 		return (
 			<div className="flex-1 bg-gray-800 p-4 flex flex-col items-center justify-center relative">
@@ -586,8 +554,8 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				>
 					<Stage
 						ref={stageRef}
-						width={1080}
-						height={768}
+						width={STAGE_WIDTH}
+						height={STAGE_HEIGHT}
 						draggable={selectedTool === "move"}
 						onMouseDown={handleMouseDown}
 						onMouseMove={handleMouseMove}
@@ -600,13 +568,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 					>
 						{/* 图像层 */}
 						<Layer>
-							{hiddenCanvas && (
-								<KonvaImage
-									image={hiddenCanvas}
-									width={width}
-									height={height}
-								/>
-							)}
+							{hiddenCanvas && <KonvaImage image={hiddenCanvas} width={width} height={height} />}
 						</Layer>
 						{/* 选区层 */}
 						<Layer>
@@ -641,12 +603,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				</div>
 
 				{/* 缩放控件 */}
-				<ZoomControls
-					zoom={stageScale}
-					onZoomIn={zoomIn}
-					onZoomOut={zoomOut}
-					onReset={resetZoom}
-				/>
+				<ZoomControls zoom={stageScale} onZoomIn={zoomIn} onZoomOut={zoomOut} onReset={resetZoom} />
 			</div>
 		)
 	}

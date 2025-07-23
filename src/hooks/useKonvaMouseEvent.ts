@@ -8,12 +8,14 @@ import { BrushSelectionTool } from "../utils/BrushSelectionTool"
 import { SelectionManager } from "../utils/SelectionManager"
 import { KonvaSelectionRenderer } from "../components/KonvaSelectionOverlay"
 import { SelectionMode } from "../utils/SelectionTypes"
+import { getRelativePointerPosition } from "../utils/TransformUtils"
 import { useKonvaMagicWandHandler } from "./useKonvaMagicWandHandler"
 import { useKonvaLassoHandler } from "./useKonvaLassoHandler"
 import { useKonvaRectangleHandler } from "./useKonvaRectangleHandler"
 import { useKonvaEllipseHandler } from "./useKonvaEllipseHandler"
 import { useKonvaBrushHandler } from "./useKonvaBrushHandler"
 import { EditTools, EditToolTypes } from "../constants"
+import Konva from "konva"
 
 interface UseKonvaMouseEventProps {
 	selectedTool: EditToolTypes
@@ -31,7 +33,9 @@ interface UseKonvaMouseEventProps {
 	setSelection: (selection: ImageData | null) => void
 	setIsDrawing: (isDrawing: boolean) => void
 	setIsDragging: (isDragging: boolean) => void
-	getRelativePointerPosition: () => { x: number; y: number } | null
+	stageRef: React.RefObject<Konva.Stage | null>
+	maxWidth: number
+	maxHeight: number
 }
 
 interface UseKonvaMouseEventReturn {
@@ -65,7 +69,9 @@ export function useKonvaMouseEvent({
 	setSelection,
 	setIsDrawing,
 	setIsDragging,
-	getRelativePointerPosition,
+	stageRef,
+	maxWidth,
+	maxHeight,
 }: UseKonvaMouseEventProps): UseKonvaMouseEventReturn {
 	// 魔术棒工具处理器
 	const magicWandHandler = useKonvaMagicWandHandler({
@@ -134,7 +140,7 @@ export function useKonvaMouseEvent({
 				return
 			}
 
-			const point = getRelativePointerPosition()
+			const point = stageRef.current && image ? getRelativePointerPosition(stageRef.current, image, maxWidth, maxHeight) : null
 			if (!point) return
 
 			const nativeEvent = e.evt
@@ -168,7 +174,6 @@ export function useKonvaMouseEvent({
 			image,
 			isCanvasReady,
 			selectedTool,
-			getRelativePointerPosition,
 			setIsDragging,
 			setIsDrawing,
 			magicWandHandler,
@@ -176,6 +181,9 @@ export function useKonvaMouseEvent({
 			rectangleHandler,
 			ellipseHandler,
 			brushHandler,
+			stageRef,
+			maxWidth,
+			maxHeight,
 		]
 	)
 
@@ -183,7 +191,7 @@ export function useKonvaMouseEvent({
 	const handleMouseMove = useCallback(() => {
 		if (!image || !isCanvasReady) return
 
-		const point = getRelativePointerPosition()
+		const point = stageRef.current && image ? getRelativePointerPosition(stageRef.current, image, maxWidth, maxHeight) : null
 		if (!point) return
 
 		// 根据工具类型处理移动事件
@@ -214,11 +222,13 @@ export function useKonvaMouseEvent({
 		image,
 		isCanvasReady,
 		selectedTool,
-		getRelativePointerPosition,
 		lassoHandler,
 		rectangleHandler,
 		ellipseHandler,
 		brushHandler,
+		stageRef,
+		maxWidth,
+		maxHeight,
 	])
 
 	// 鼠标释放事件
@@ -229,7 +239,7 @@ export function useKonvaMouseEvent({
 
 			if (!image || !isCanvasReady) return
 
-			const point = getRelativePointerPosition()
+			const point = stageRef.current && image ? getRelativePointerPosition(stageRef.current, image, maxWidth, maxHeight) : null
 			if (!point) return
 
 			const nativeEvent = e.evt
@@ -266,13 +276,15 @@ export function useKonvaMouseEvent({
 			image,
 			isCanvasReady,
 			selectedTool,
-			getRelativePointerPosition,
 			setIsDragging,
 			setIsDrawing,
 			lassoHandler,
 			rectangleHandler,
 			ellipseHandler,
 			brushHandler,
+			stageRef,
+			maxWidth,
+			maxHeight,
 		]
 	)
 
