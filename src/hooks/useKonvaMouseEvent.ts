@@ -4,6 +4,7 @@ import { MagicWandTool } from "../utils/MagicWandTool"
 import { LassoTool } from "../utils/LassoTool"
 import { RectangleSelectionTool } from "../utils/RectangleSelectionTool"
 import { EllipseSelectionTool } from "../utils/EllipseSelectionTool"
+import { BrushSelectionTool } from "../utils/BrushSelectionTool"
 import { SelectionManager } from "../utils/SelectionManager"
 import { SelectionRenderer } from "../utils/SelectionRenderer"
 import { KonvaSelectionRenderer } from "../components/KonvaSelectionOverlay"
@@ -12,15 +13,18 @@ import { useKonvaMagicWandHandler } from "./useKonvaMagicWandHandler"
 import { useKonvaLassoHandler } from "./useKonvaLassoHandler"
 import { useKonvaRectangleHandler } from "./useKonvaRectangleHandler"
 import { useKonvaEllipseHandler } from "./useKonvaEllipseHandler"
+import { useKonvaBrushHandler } from "./useKonvaBrushHandler"
+import { EditTools, EditToolTypes } from "../constants"
 
 interface UseKonvaMouseEventProps {
-	selectedTool: string
+	selectedTool: EditToolTypes
 	image: HTMLImageElement | null
 	isCanvasReady: boolean
 	magicWandTool: MagicWandTool | null
 	lassoTool: LassoTool | null
 	rectangleTool: RectangleSelectionTool | null
 	ellipseTool: EllipseSelectionTool | null
+	brushTool: BrushSelectionTool | null
 	selectionManager: SelectionManager | null
 	selectionRenderer: SelectionRenderer | null
 	konvaSelectionRenderer: KonvaSelectionRenderer | null
@@ -56,6 +60,7 @@ export function useKonvaMouseEvent({
 	lassoTool,
 	rectangleTool,
 	ellipseTool,
+	brushTool,
 	selectionManager,
 	selectionRenderer,
 	konvaSelectionRenderer,
@@ -67,7 +72,6 @@ export function useKonvaMouseEvent({
 	setIsDragging,
 	getRelativePointerPosition,
 }: UseKonvaMouseEventProps): UseKonvaMouseEventReturn {
-
 	// 魔术棒工具处理器
 	const magicWandHandler = useKonvaMagicWandHandler({
 		magicWandTool,
@@ -78,7 +82,7 @@ export function useKonvaMouseEvent({
 		currentMode,
 		onSelectionChange,
 		setSelection,
-		enabled: selectedTool === "magic-wand",
+		enabled: selectedTool === EditTools.MAGIC_WAND,
 	})
 
 	// 套索工具处理器
@@ -91,7 +95,7 @@ export function useKonvaMouseEvent({
 		currentMode,
 		onSelectionChange,
 		setSelection,
-		enabled: selectedTool === "lasso",
+		enabled: selectedTool === EditTools.LASSO,
 	})
 
 	// 矩形选区工具处理器
@@ -104,7 +108,7 @@ export function useKonvaMouseEvent({
 		currentMode,
 		onSelectionChange,
 		setSelection,
-		enabled: selectedTool === "rectangle-select",
+		enabled: selectedTool === EditTools.RECTANGLE_SELECT,
 	})
 
 	// 椭圆选区工具处理器
@@ -117,7 +121,20 @@ export function useKonvaMouseEvent({
 		currentMode,
 		onSelectionChange,
 		setSelection,
-		enabled: selectedTool === "ellipse-select",
+		enabled: selectedTool === EditTools.ELLIPSE_SELECT,
+	})
+
+	// 画笔选区工具处理器
+	const brushHandler = useKonvaBrushHandler({
+		brushTool,
+		selectionManager,
+		selectionRenderer,
+		konvaSelectionRenderer,
+		useKonvaRenderer,
+		currentMode,
+		onSelectionChange,
+		setSelection,
+		enabled: selectedTool === EditTools.BRUSH_SELECT,
 	})
 
 	// 鼠标按下事件
@@ -127,7 +144,7 @@ export function useKonvaMouseEvent({
 
 			e.evt.preventDefault()
 
-			if (selectedTool === "move") {
+			if (selectedTool === EditTools.MOVE) {
 				setIsDragging(true)
 				return
 			}
@@ -139,19 +156,23 @@ export function useKonvaMouseEvent({
 
 			// 根据当前工具分发事件
 			switch (selectedTool) {
-				case "magic-wand":
+				case EditTools.MAGIC_WAND:
 					magicWandHandler.handleMouseDown(point.x, point.y, nativeEvent)
 					break
-				case "lasso":
+				case EditTools.LASSO:
 					lassoHandler.handleMouseDown(point.x, point.y)
 					break
-				case "rectangle-select":
+				case EditTools.RECTANGLE_SELECT:
 					setIsDrawing(true)
 					rectangleHandler.handleMouseDown(point.x, point.y)
 					break
-				case "ellipse-select":
+				case EditTools.ELLIPSE_SELECT:
 					setIsDrawing(true)
 					ellipseHandler.handleMouseDown(point.x, point.y)
+					break
+				case EditTools.BRUSH_SELECT:
+					setIsDrawing(true)
+					brushHandler.handleMouseDown(point.x, point.y)
 					break
 				default:
 					// 可以在这里添加其他工具的处理
@@ -169,6 +190,7 @@ export function useKonvaMouseEvent({
 			lassoHandler,
 			rectangleHandler,
 			ellipseHandler,
+			brushHandler,
 		]
 	)
 
@@ -181,17 +203,22 @@ export function useKonvaMouseEvent({
 
 		// 根据工具类型处理移动事件
 		switch (selectedTool) {
-			case "lasso":
+			case EditTools.LASSO:
 				lassoHandler.handleMouseMove(point.x, point.y)
 				break
-			case "rectangle-select":
+			case EditTools.RECTANGLE_SELECT:
 				if (rectangleHandler.isDrawing) {
 					rectangleHandler.handleMouseMove(point.x, point.y)
 				}
 				break
-			case "ellipse-select":
+			case EditTools.ELLIPSE_SELECT:
 				if (ellipseHandler.isDrawing) {
 					ellipseHandler.handleMouseMove(point.x, point.y)
+				}
+				break
+			case EditTools.BRUSH_SELECT:
+				if (brushHandler.isDrawing) {
+					brushHandler.handleMouseMove(point.x, point.y)
 				}
 				break
 			default:
@@ -206,6 +233,7 @@ export function useKonvaMouseEvent({
 		lassoHandler,
 		rectangleHandler,
 		ellipseHandler,
+		brushHandler,
 	])
 
 	// 鼠标释放事件
@@ -223,19 +251,25 @@ export function useKonvaMouseEvent({
 
 			// 根据工具类型处理释放事件
 			switch (selectedTool) {
-				case "lasso":
+				case EditTools.LASSO:
 					lassoHandler.handleMouseUp(nativeEvent)
 					break
-				case "rectangle-select":
+				case EditTools.RECTANGLE_SELECT:
 					if (rectangleHandler.isDrawing) {
 						setIsDrawing(false)
 						rectangleHandler.handleMouseUp(point.x, point.y, nativeEvent)
 					}
 					break
-				case "ellipse-select":
+				case EditTools.ELLIPSE_SELECT:
 					if (ellipseHandler.isDrawing) {
 						setIsDrawing(false)
 						ellipseHandler.handleMouseUp(point.x, point.y, nativeEvent)
+					}
+					break
+				case EditTools.BRUSH_SELECT:
+					if (brushHandler.isDrawing) {
+						setIsDrawing(false)
+						brushHandler.handleMouseUp(nativeEvent)
 					}
 					break
 				default:
@@ -253,6 +287,7 @@ export function useKonvaMouseEvent({
 			lassoHandler,
 			rectangleHandler,
 			ellipseHandler,
+			brushHandler,
 		]
 	)
 

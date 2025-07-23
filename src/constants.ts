@@ -4,7 +4,8 @@ export const EditTools = {
   LASSO: "lasso", 
   MAGIC_WAND: "magic-wand",
   RECTANGLE_SELECT: "rectangle-select",
-  ELLIPSE_SELECT: "ellipse-select"
+  ELLIPSE_SELECT: "ellipse-select",
+  BRUSH_SELECT: "brush-select"
 } as const
 
 export type EditToolTypes = (typeof EditTools)[keyof typeof EditTools]

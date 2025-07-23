@@ -1,5 +1,5 @@
 import React from "react"
-import { Move, MousePointer, Lasso, Wand2, RotateCcw, RotateCw, Redo2, LucideIcon, X, Square, Circle } from "lucide-react"
+import { Move, MousePointer, Lasso, Wand2, RotateCcw, RotateCw, Redo2, LucideIcon, X, Square, Circle, Brush } from "lucide-react"
 import { EditTools, EditToolTypes } from "../constants"
 
 interface ToolbarProps {
@@ -22,6 +22,7 @@ const tools: { id: EditToolTypes; icon: LucideIcon; name: string }[] = [
 	{ id: EditTools.RECTANGLE_SELECT, icon: Square, name: "矩形选择" },
 	{ id: EditTools.ELLIPSE_SELECT, icon: Circle, name: "椭圆选择" },
 	{ id: EditTools.LASSO, icon: Lasso, name: "套索工具" },
+	{ id: EditTools.BRUSH_SELECT, icon: Brush, name: "画笔选择" },
 	{ id: EditTools.MAGIC_WAND, icon: Wand2, name: "魔术棒" },
 ]
 

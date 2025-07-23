@@ -4,7 +4,7 @@ import Konva from 'konva'
 
 // 通用工具预览数据接口
 export interface ToolPreviewData {
-  type: 'lasso' | 'rectangle' | 'ellipse' | 'polygon'
+  type: 'lasso' | 'rectangle' | 'ellipse' | 'polygon' | 'brush'
   data: unknown
 }
 
@@ -41,7 +41,17 @@ export interface EllipsePreviewData extends ToolPreviewData {
   }
 }
 
-export type PreviewData = LassoPreviewData | RectanglePreviewData | EllipsePreviewData
+// 画笔预览数据
+export interface BrushPreviewData extends ToolPreviewData {
+  type: 'brush'
+  data: {
+    points: [number, number][]
+    brushSize: number
+    isDrawing: boolean
+  }
+}
+
+export type PreviewData = LassoPreviewData | RectanglePreviewData | EllipsePreviewData | BrushPreviewData
 
 interface KonvaToolPreviewProps {
   previewData: PreviewData | null
@@ -187,6 +197,64 @@ export const KonvaToolPreview: React.FC<KonvaToolPreviewProps> = ({
     )
   }
 
+  // 渲染画笔预览
+  const renderBrushPreview = (data: BrushPreviewData['data']) => {
+    const { points, brushSize } = data
+    
+    if (points.length === 0) return null
+
+    return (
+      <Group>
+        {/* 只在当前鼠标位置显示笔刷圆圈 */}
+        {points.length > 0 && (
+          <Shape
+            sceneFunc={(context: Konva.Context) => {
+              const ctx = context._context
+              const currentPoint = points[points.length - 1] // 只显示最后一个点（当前鼠标位置）
+              
+              ctx.save()
+              ctx.strokeStyle = '#00ff00'
+              ctx.fillStyle = 'rgba(0, 255, 0, 0.1)'
+              ctx.lineWidth = 2
+              ctx.setLineDash([3, 3])
+              ctx.lineDashOffset = dashOffset
+              
+              // 绘制当前笔刷位置的圆形预览
+              ctx.beginPath()
+              ctx.arc(currentPoint[0], currentPoint[1], brushSize / 2, 0, 2 * Math.PI)
+              ctx.stroke()
+              ctx.fill()
+              ctx.restore()
+            }}
+            listening={false}
+          />
+        )}
+        {/* 已绘制路径的连接线预览 */}
+        {points.length > 1 && (
+          <Shape
+            sceneFunc={(context: Konva.Context) => {
+              const ctx = context._context
+              ctx.save()
+              ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)'
+              ctx.lineWidth = brushSize
+              ctx.lineCap = 'round'
+              ctx.lineJoin = 'round'
+              
+              ctx.beginPath()
+              ctx.moveTo(points[0][0], points[0][1])
+              for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i][0], points[i][1])
+              }
+              ctx.stroke()
+              ctx.restore()
+            }}
+            listening={false}
+          />
+        )}
+      </Group>
+    )
+  }
+
   // 根据类型渲染对应的预览
   const renderPreview = () => {
     switch (previewData.type) {
@@ -196,6 +264,8 @@ export const KonvaToolPreview: React.FC<KonvaToolPreviewProps> = ({
         return renderRectanglePreview(previewData.data)
       case 'ellipse':
         return renderEllipsePreview(previewData.data)
+      case 'brush':
+        return renderBrushPreview(previewData.data)
       default:
         return null
     }

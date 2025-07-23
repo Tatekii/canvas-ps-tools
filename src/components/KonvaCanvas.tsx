@@ -6,6 +6,7 @@ import { MagicWandTool } from "../utils/MagicWandTool"
 import { LassoTool } from "../utils/LassoTool"
 import { RectangleSelectionTool } from "../utils/RectangleSelectionTool"
 import { EllipseSelectionTool } from "../utils/EllipseSelectionTool"
+import { BrushSelectionTool } from "../utils/BrushSelectionTool"
 import { SelectionRenderer } from "../utils/SelectionRenderer"
 import { SelectionManager } from "../utils/SelectionManager"
 import { getShortcutHints } from "../utils/KeyboardUtils"
@@ -45,6 +46,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 		const [lassoTool, setLassoTool] = useState<LassoTool | null>(null)
 		const [rectangleTool, setRectangleTool] = useState<RectangleSelectionTool | null>(null)
 		const [ellipseTool, setEllipseTool] = useState<EllipseSelectionTool | null>(null)
+		const [brushTool, setBrushTool] = useState<BrushSelectionTool | null>(null)
 		const [selectionRenderer, setSelectionRenderer] = useState<SelectionRenderer | null>(null)
 		const [konvaSelectionRenderer, setKonvaSelectionRenderer] = useState<KonvaSelectionRenderer | null>(null)
 
@@ -182,9 +184,25 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 					}
 				}
 				
+				const brushPreviewCallback = (points: [number, number][], brushSize: number, isDrawing: boolean) => {
+					if (isDrawing) {
+						setPreviewData({
+							type: 'brush',
+							data: {
+								points,
+								brushSize,
+								isDrawing
+							}
+						})
+					} else {
+						setPreviewData(null)
+					}
+				}
+				
 				// 初始化新的选区工具
 				const rectangle = new RectangleSelectionTool(canvas, manager, rectanglePreviewCallback)
 				const ellipse = new EllipseSelectionTool(canvas, manager, ellipsePreviewCallback)
+				const brush = new BrushSelectionTool(canvas, manager, brushPreviewCallback)
 				
 				const renderer = new SelectionRenderer(overlayCanvas)
 				
@@ -198,6 +216,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 				setLassoTool(lasso)
 				setRectangleTool(rectangle)
 				setEllipseTool(ellipse)
+				setBrushTool(brush)
 				setSelectionRenderer(renderer)
 				setKonvaSelectionRenderer(konvaRenderer)
 
@@ -258,6 +277,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			lassoTool,
 			rectangleTool,
 			ellipseTool,
+			brushTool,
 			selectionManager,
 			selectionRenderer,
 			konvaSelectionRenderer,
