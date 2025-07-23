@@ -539,29 +539,40 @@ export const useMarchingAnts = () => useSelectionStore((state) => state.marching
 // 获取选区模式
 export const useSelectionMode = () => useSelectionStore((state) => state.selectionMode)
 
-// 获取选区操作函数
-export const useSelectionActions = () => useSelectionStore((state) => ({
-  createSelection: state.createSelection,
-  updateSelection: state.updateSelection,
-  clearSelection: state.clearSelection,
-  moveSelection: state.moveSelection,
-  setSelectionMode: state.setSelectionMode,
-  isPointInSelection: state.isPointInSelection,
-  getSelectionBounds: state.getSelectionBounds,
-  getSelectionCenter: state.getSelectionCenter
-}))
+// 获取选区操作函数 - 使用稳定的选择器
+export const useSelectionActions = () => {
+  const createSelection = useSelectionStore((state) => state.createSelection)
+  const updateSelection = useSelectionStore((state) => state.updateSelection)
+  const clearSelection = useSelectionStore((state) => state.clearSelection)
+  const moveSelection = useSelectionStore((state) => state.moveSelection)
+  const setSelectionMode = useSelectionStore((state) => state.setSelectionMode)
+  const isPointInSelection = useSelectionStore((state) => state.isPointInSelection)
+  const getSelectionBounds = useSelectionStore((state) => state.getSelectionBounds)
+  const getSelectionCenter = useSelectionStore((state) => state.getSelectionCenter)
+  
+  return {
+    createSelection,
+    updateSelection,
+    clearSelection,
+    moveSelection,
+    setSelectionMode,
+    isPointInSelection,
+    getSelectionBounds,
+    getSelectionCenter
+  }
+}
 
-// 获取选区历史操作
-export const useSelectionHistory = () => useSelectionStore((state) => ({
-  undoSelection: state.undoSelection,
-  redoSelection: state.redoSelection,
-  canUndoSelection: state.canUndoSelection,
-  canRedoSelection: state.canRedoSelection
-}))
+// 获取选区历史操作 - 使用稳定的选择器
+export const useSelectionHistory = () => {
+  const undoSelection = useSelectionStore((state) => state.undoSelection)
+  const redoSelection = useSelectionStore((state) => state.redoSelection)
+  const canUndoSelection = useSelectionStore((state) => state.canUndoSelection)
+  const canRedoSelection = useSelectionStore((state) => state.canRedoSelection)
+  
+  return { undoSelection, redoSelection, canUndoSelection, canRedoSelection }
+}
 
-// 获取蚂蚁线控制函数
-export const useMarchingAntsControls = () => useSelectionStore((state) => ({
-  startMarchingAnts: state.startMarchingAnts,
-  stopMarchingAnts: state.stopMarchingAnts,
-  updateMarchingAnts: state.updateMarchingAnts
-}))
+// Individual marching ants control hooks for stable references
+export const useStartMarchingAnts = () => useSelectionStore((state) => state.startMarchingAnts)
+export const useStopMarchingAnts = () => useSelectionStore((state) => state.stopMarchingAnts)
+export const useUpdateMarchingAnts = () => useSelectionStore((state) => state.updateMarchingAnts)

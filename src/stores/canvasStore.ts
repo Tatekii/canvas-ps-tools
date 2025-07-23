@@ -372,26 +372,37 @@ export const useWorkspace = () => useCanvasStore((state) => state.workspace)
 // 获取画布就绪状态
 export const useCanvasReady = () => useCanvasStore((state) => state.isReady)
 
-// 获取坐标转换函数
-export const useCoordinateTransform = () => useCanvasStore((state) => ({
-  transformPoint: state.transformPoint,
-  getViewportBounds: state.getViewportBounds,
-  isPointInViewport: state.isPointInViewport
-}))
+// Individual coordinate transform hooks for stable references
+export const useTransformPoint = () => useCanvasStore((state) => state.transformPoint)
+export const useGetViewportBounds = () => useCanvasStore((state) => state.getViewportBounds)
+export const useIsPointInViewport = () => useCanvasStore((state) => state.isPointInViewport)
 
-// 获取缩放控制函数
-export const useZoomControls = () => useCanvasStore((state) => ({
-  zoomIn: state.zoomIn,
-  zoomOut: state.zoomOut,
-  zoomToFit: state.zoomToFit,
-  resetZoom: state.resetZoom,
-  scale: state.viewport.scale
-}))
+// 获取缩放控制函数 - 使用稳定的选择器
+export const useZoomControls = () => {
+  const zoomIn = useCanvasStore((state) => state.zoomIn)
+  const zoomOut = useCanvasStore((state) => state.zoomOut)
+  const zoomToFit = useCanvasStore((state) => state.zoomToFit)
+  const resetZoom = useCanvasStore((state) => state.resetZoom)
+  const scale = useCanvasStore((state) => state.viewport.scale)
+  
+  return { zoomIn, zoomOut, zoomToFit, resetZoom, scale }
+}
 
-// 获取平移控制函数
-export const usePanControls = () => useCanvasStore((state) => ({
-  panTo: state.panTo,
-  panBy: state.panBy,
-  centerView: state.centerView,
-  position: { x: state.viewport.x, y: state.viewport.y }
-}))
+// 获取平移控制函数 - 使用稳定的选择器
+export const usePanControls = () => {
+  const panTo = useCanvasStore((state) => state.panTo)
+  const panBy = useCanvasStore((state) => state.panBy)
+  const centerView = useCanvasStore((state) => state.centerView)
+  const x = useCanvasStore((state) => state.viewport.x)
+  const y = useCanvasStore((state) => state.viewport.y)
+  
+  return { panTo, panBy, centerView, position: { x, y } }
+}
+
+// Individual action selectors for stable references
+export const useSetStageRef = () => useCanvasStore((state) => state.setStageRef)
+export const useSetReady = () => useCanvasStore((state) => state.setReady)
+export const usePanTo = () => useCanvasStore((state) => state.panTo)
+export const usePanBy = () => useCanvasStore((state) => state.panBy)
+export const useCenterView = () => useCanvasStore((state) => state.centerView)
+export const useUpdateViewportTransform = () => useCanvasStore((state) => state.updateViewportTransform)

@@ -260,25 +260,21 @@ export const useEraserConfig = () => useToolStore((state) => state.eraserConfig)
 export const useSelectionConfig = () => useToolStore((state) => state.selectionConfig)
 export const useTextConfig = () => useToolStore((state) => state.textConfig)
 
-// 获取快捷键状态
-export const useKeyboardState = () => useToolStore((state) => ({
-  isSpacePressed: state.isSpacePressed,
-  isAltPressed: state.isAltPressed,
-  isShiftPressed: state.isShiftPressed,
-  isCtrlPressed: state.isCtrlPressed
-}))
+// Individual keyboard state hooks for stable references
+export const useIsSpacePressed = () => useToolStore((state) => state.isSpacePressed)
+export const useIsAltPressed = () => useToolStore((state) => state.isAltPressed)
+export const useIsShiftPressed = () => useToolStore((state) => state.isShiftPressed)
+export const useIsCtrlPressed = () => useToolStore((state) => state.isCtrlPressed)
 
-// 获取工具操作函数
-export const useToolActions = () => useToolStore((state) => ({
-  setActiveTool: state.setActiveTool,
-  setActiveSelectionTool: state.setActiveSelectionTool,
-  updateBrushConfig: state.updateBrushConfig,
-  updateEraserConfig: state.updateEraserConfig,
-  updateSelectionConfig: state.updateSelectionConfig,
-  updateTextConfig: state.updateTextConfig,
-  setKeyPressed: state.setKeyPressed,
-  resetToolConfigs: state.resetToolConfigs
-}))
+// Individual tool action hooks for stable references
+export const useSetActiveTool = () => useToolStore((state) => state.setActiveTool)
+export const useSetActiveSelectionTool = () => useToolStore((state) => state.setActiveSelectionTool)
+export const useUpdateBrushConfig = () => useToolStore((state) => state.updateBrushConfig)
+export const useUpdateEraserConfig = () => useToolStore((state) => state.updateEraserConfig)
+export const useUpdateSelectionConfig = () => useToolStore((state) => state.updateSelectionConfig)
+export const useUpdateTextConfig = () => useToolStore((state) => state.updateTextConfig)
+export const useSetKeyPressed = () => useToolStore((state) => state.setKeyPressed)
+export const useResetToolConfigs = () => useToolStore((state) => state.resetToolConfigs)
 
 // 计算出的工具状态 (考虑快捷键临时切换)
 export const useEffectiveTool = () => useToolStore((state) => {

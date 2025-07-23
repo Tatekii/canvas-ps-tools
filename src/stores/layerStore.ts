@@ -393,23 +393,19 @@ export const useVisibleLayers = () => useLayerStore((state) =>
   state.layers.filter(layer => layer.visible)
 )
 
-// 获取图层操作函数
-export const useLayerActions = () => useLayerStore((state) => ({
-  addLayer: state.addLayer,
-  removeLayer: state.removeLayer,
-  duplicateLayer: state.duplicateLayer,
-  setActiveLayer: state.setActiveLayer,
-  updateLayerTransform: state.updateLayerTransform,
-  updateLayerOpacity: state.updateLayerOpacity,
-  updateLayerVisibility: state.updateLayerVisibility,
-  renameLayer: state.renameLayer
-}))
+// Individual layer action hooks for stable references
+export const useAddLayer = () => useLayerStore((state) => state.addLayer)
+export const useRemoveLayer = () => useLayerStore((state) => state.removeLayer)
+export const useDuplicateLayer = () => useLayerStore((state) => state.duplicateLayer)
+export const useSetActiveLayer = () => useLayerStore((state) => state.setActiveLayer)
+export const useUpdateLayerTransform = () => useLayerStore((state) => state.updateLayerTransform)
+export const useUpdateLayerOpacity = () => useLayerStore((state) => state.updateLayerOpacity)
+export const useUpdateLayerVisibility = () => useLayerStore((state) => state.updateLayerVisibility)
+export const useRenameLayer = () => useLayerStore((state) => state.renameLayer)
 
-// 获取图层排序函数
-export const useLayerReorder = () => useLayerStore((state) => ({
-  moveLayerUp: state.moveLayerUp,
-  moveLayerDown: state.moveLayerDown,
-  moveLayerToTop: state.moveLayerToTop,
-  moveLayerToBottom: state.moveLayerToBottom,
-  reorderLayers: state.reorderLayers
-}))
+// Individual layer reorder hooks for stable references
+export const useMoveLayerUp = () => useLayerStore((state) => state.moveLayerUp)
+export const useMoveLayerDown = () => useLayerStore((state) => state.moveLayerDown)
+export const useMoveLayerToTop = () => useLayerStore((state) => state.moveLayerToTop)
+export const useMoveLayerToBottom = () => useLayerStore((state) => state.moveLayerToBottom)
+export const useReorderLayers = () => useLayerStore((state) => state.reorderLayers)
