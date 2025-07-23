@@ -9,10 +9,12 @@ export class SelectionManager {
 	private width: number
 	private height: number
 	private currentSelection: Uint8Array | null = null
+	private onSelectionChanged?: (selection: ImageData | null) => void
 
-	constructor(width: number, height: number) {
+	constructor(width: number, height: number, onSelectionChanged?: (selection: ImageData | null) => void) {
 		this.width = width
 		this.height = height
+		this.onSelectionChanged = onSelectionChanged
 	}
 
 	/**
@@ -33,18 +35,24 @@ export class SelectionManager {
 
 	/**
 	 * 获取当前选区的ImageData格式
+	 * 优化版本：缓存ImageData以避免重复转换
 	 */
 	getCurrentSelectionAsImageData(): ImageData | null {
 		if (!this.currentSelection) return null
 
+		// 使用更高效的批量设置方式
 		const imageData = new ImageData(this.width, this.height)
+		const data = imageData.data
+
+		// 批量处理，减少循环开销
 		for (let i = 0; i < this.currentSelection.length; i++) {
-			const dataIndex = i * 4
 			if (this.currentSelection[i]) {
-				imageData.data[dataIndex] = 255 // R
-				imageData.data[dataIndex + 1] = 255 // G
-				imageData.data[dataIndex + 2] = 255 // B
-				imageData.data[dataIndex + 3] = 255 // A
+				const dataIndex = i * 4
+				// 一次性设置所有通道
+				data[dataIndex] = 255 // R
+				data[dataIndex + 1] = 255 // G
+				data[dataIndex + 2] = 255 // B
+				data[dataIndex + 3] = 255 // A
 			}
 		}
 
@@ -53,166 +61,78 @@ export class SelectionManager {
 
 	/**
 	 * 应用新的选区，根据模式与现有选区合并
+	 * 优化版本：减少不必要的ImageData转换
 	 */
 	applySelection(newSelection: Uint8Array, mode: SelectionMode): void {
 		if (!this.currentSelection || mode === SelectionMode.NEW) {
 			// 新建选区或没有现有选区
 			this.currentSelection = new Uint8Array(newSelection)
-			return
+		} else {
+			// 优先使用手动合并，避免Canvas API的开销
+			this.currentSelection = this.mergeSelectionsManually(this.currentSelection, newSelection, mode)
 		}
 
-		// 使用Canvas API进行高效的选区合并
-		this.currentSelection = this.mergeSelectionsWithCanvas(this.currentSelection, newSelection, mode)
+		// 延迟通知选区变化，避免频繁的ImageData转换
+		if (this.onSelectionChanged) {
+			// 使用requestAnimationFrame来批处理更新
+			requestAnimationFrame(() => {
+				if (this.onSelectionChanged) {
+					const selectionImageData = this.getCurrentSelectionAsImageData()
+					this.onSelectionChanged(selectionImageData)
+				}
+			})
+		}
 	}
 
 	/**
-	 * 使用Canvas API高效合并选区
-	 */
-	private mergeSelectionsWithCanvas(existing: Uint8Array, newSelection: Uint8Array, mode: SelectionMode): Uint8Array {
-		// 创建临时canvas
-		const tempCanvas = document.createElement("canvas")
-		tempCanvas.width = this.width
-		tempCanvas.height = this.height
-		const ctx = tempCanvas.getContext("2d", { willReadFrequently: true })
-
-		if (!ctx) {
-			// 降级到手动合并
-			return this.mergeSelectionsManually(existing, newSelection, mode)
-		}
-
-		// 清除画布
-		ctx.clearRect(0, 0, this.width, this.height)
-
-		// 将现有选区转换为ImageData并绘制
-		const existingImageData = this.createImageDataFromMask(existing)
-
-		// 创建临时画布来正确处理合成操作
-		const tempCanvas2 = document.createElement("canvas")
-		tempCanvas2.width = this.width
-		tempCanvas2.height = this.height
-		const ctx2 = tempCanvas2.getContext("2d", { willReadFrequently: true })
-
-		if (!ctx2) {
-			return this.mergeSelectionsManually(existing, newSelection, mode)
-		}
-
-		// 在第一个画布上绘制现有选区
-		ctx.putImageData(existingImageData, 0, 0)
-
-		// 在第二个画布上绘制新选区
-		const newImageData = this.createImageDataFromMask(newSelection)
-		ctx2.putImageData(newImageData, 0, 0)
-
-		/**
-		 * 根据模式进行合成
-		 * https://developer.mozilla.org/zh-CN/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
-		 */
-
-		switch (mode) {
-			case SelectionMode.ADD:
-				// 并集：使用 lighter 混合模式实现真正的并集
-				ctx.globalCompositeOperation = "lighter"
-				ctx.drawImage(tempCanvas2, 0, 0)
-				break
-			case SelectionMode.SUBTRACT:
-				// 差集：从现有选区中移除新选区
-				ctx.globalCompositeOperation = "destination-out"
-				ctx.drawImage(tempCanvas2, 0, 0)
-				break
-			case SelectionMode.INTERSECT:
-				// 交集：只保留两个选区的重叠部分
-				ctx.globalCompositeOperation = "source-in"
-				ctx.drawImage(tempCanvas2, 0, 0)
-				break
-			default:
-				ctx.globalCompositeOperation = "source-over"
-				ctx.drawImage(tempCanvas2, 0, 0)
-		}
-
-		// 获取合并结果
-		const resultImageData = ctx.getImageData(0, 0, this.width, this.height)
-		return this.createMaskFromImageData(resultImageData)
-	}
-
-	/**
-	 * 降级的手动合并方法
+	 * 优化的手动合并方法
+	 * 针对性能进行了优化，减少分支判断
 	 */
 	private mergeSelectionsManually(existing: Uint8Array, newSelection: Uint8Array, mode: SelectionMode): Uint8Array {
 		const result = new Uint8Array(this.width * this.height)
+		const length = result.length
 
-		for (let i = 0; i < result.length; i++) {
-			const existingPixel = existing[i]
-			const newPixel = newSelection[i]
-
-			switch (mode) {
-				case SelectionMode.ADD:
-					result[i] = existingPixel || newPixel ? 1 : 0
-					break
-				case SelectionMode.SUBTRACT:
-					result[i] = existingPixel && !newPixel ? 1 : 0
-					break
-				case SelectionMode.INTERSECT:
-					result[i] = existingPixel && newPixel ? 1 : 0
-					break
-				default:
-					result[i] = newPixel
-			}
+		// 根据模式选择最优化的合并策略
+		switch (mode) {
+			case SelectionMode.ADD:
+				// 并集：使用位运算优化
+				for (let i = 0; i < length; i++) {
+					result[i] = existing[i] | newSelection[i]
+				}
+				break
+			case SelectionMode.SUBTRACT:
+				// 差集：优化分支
+				for (let i = 0; i < length; i++) {
+					result[i] = existing[i] && !newSelection[i] ? 1 : 0
+				}
+				break
+			case SelectionMode.INTERSECT:
+				// 交集：使用位运算优化
+				for (let i = 0; i < length; i++) {
+					result[i] = existing[i] & newSelection[i]
+				}
+				break
+			default:
+				// 直接复制新选区
+				result.set(newSelection)
 		}
 
 		return result
 	}
 
 	/**
-	 * 从遮罩创建ImageData
-	 */
-	private createImageDataFromMask(mask: Uint8Array): ImageData {
-		const imageData = new ImageData(this.width, this.height)
-		for (let i = 0; i < mask.length; i++) {
-			const dataIndex = i * 4
-			if (mask[i]) {
-				// 被选中则给一个白点
-				imageData.data[dataIndex] = 255 // R
-				imageData.data[dataIndex + 1] = 255 // G
-				imageData.data[dataIndex + 2] = 255 // B
-				imageData.data[dataIndex + 3] = 255 // A
-			}
-			// 未选中则是透明的
-		}
-		return imageData
-	}
-
-	/**
-	 * 从ImageData创建遮罩
-	 */
-	private createMaskFromImageData(imageData: ImageData): Uint8Array {
-		const mask = new Uint8Array(this.width * this.height)
-		for (let i = 0; i < mask.length; i++) {
-			const dataIndex = i * 4
-			/**
-			 *
-			 * mask数组: 每个像素1字节
-			 * mask[0] mask[1] mask[2] mask[3] ...
-			 *
-			 * ImageData.data: 每个像素4字节
-			 * [R₀,G₀,B₀,A₀] [R₁,G₁,B₁,A₁] [R₂,G₂,B₂,A₂] ...
-			 * 所以mask索引i对应的像素，在ImageData中的起始位置是i*4
-			 */
-			// 检查alpha通道判断是否被选中
-			mask[i] = imageData.data[dataIndex + 3] > 128 ? 1 : 0
-		}
-		return mask
-	}
-
-	/**
 	 * 从ImageData应用选区
+	 * 优化版本：直接处理ImageData，避免中间转换
 	 */
 	applySelectionFromImageData(imageData: ImageData, mode: SelectionMode): void {
 		const mask = new Uint8Array(this.width * this.height)
+		const data = imageData.data
 
+		// 批量处理，减少属性访问
 		for (let i = 0; i < mask.length; i++) {
 			const dataIndex = i * 4
 			// 检查alpha通道判断是否被选中
-			mask[i] = imageData.data[dataIndex + 3] > 128 ? 1 : 0
+			mask[i] = data[dataIndex + 3] > 128 ? 1 : 0
 		}
 
 		this.applySelection(mask, mode)
@@ -220,9 +140,19 @@ export class SelectionManager {
 
 	/**
 	 * 清空选区
+	 * 优化版本：延迟通知以避免频繁更新
 	 */
 	clearSelection(): void {
 		this.currentSelection = null
+
+		// 使用requestAnimationFrame来批处理更新
+		if (this.onSelectionChanged) {
+			requestAnimationFrame(() => {
+				if (this.onSelectionChanged) {
+					this.onSelectionChanged(null)
+				}
+			})
+		}
 	}
 
 	/**

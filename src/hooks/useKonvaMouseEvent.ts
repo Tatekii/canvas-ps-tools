@@ -7,7 +7,7 @@ import { EllipseSelectionTool } from "../utils/EllipseSelectionTool"
 import { BrushSelectionTool } from "../utils/BrushSelectionTool"
 import { SelectionManager } from "../utils/SelectionManager"
 import { KonvaSelectionRenderer } from "../components/KonvaSelectionOverlay"
-import { SelectionMode } from "../utils/SelectionTypes"
+// 移除 SelectionMode 导入 - 不再需要传递 currentMode
 import { getRelativePointerPosition } from "../utils/TransformUtils"
 import { useKonvaMagicWandHandler } from "./useKonvaMagicWandHandler"
 import { useKonvaLassoHandler } from "./useKonvaLassoHandler"
@@ -28,7 +28,7 @@ interface UseKonvaMouseEventProps {
 	brushTool: BrushSelectionTool | null
 	selectionManager: SelectionManager | null
 	konvaSelectionRenderer: KonvaSelectionRenderer | null
-	currentMode: SelectionMode
+	// 移除 currentMode - 现在完全从鼠标事件中获取选区模式
 	onSelectionChange: (hasSelection: boolean, area?: number) => void
 	setSelection: (selection: ImageData | null) => void
 	setIsDrawing: (isDrawing: boolean) => void
@@ -64,7 +64,7 @@ export function useKonvaMouseEvent({
 	brushTool,
 	selectionManager,
 	konvaSelectionRenderer,
-	currentMode,
+	// 移除 currentMode 参数 - 不再需要
 	onSelectionChange,
 	setSelection,
 	setIsDrawing,
@@ -78,7 +78,7 @@ export function useKonvaMouseEvent({
 		magicWandTool,
 		selectionManager,
 		konvaSelectionRenderer,
-		currentMode,
+		// 移除 currentMode - 直接从鼠标事件获取
 		onSelectionChange,
 		setSelection,
 		enabled: selectedTool === EditTools.MAGIC_WAND,
@@ -89,7 +89,7 @@ export function useKonvaMouseEvent({
 		lassoTool,
 		selectionManager,
 		konvaSelectionRenderer,
-		currentMode,
+		// 移除 currentMode - 直接从鼠标事件获取
 		onSelectionChange,
 		setSelection,
 		enabled: selectedTool === EditTools.LASSO,
@@ -100,7 +100,7 @@ export function useKonvaMouseEvent({
 		rectangleTool,
 		selectionManager,
 		konvaSelectionRenderer,
-		currentMode,
+		// 移除 currentMode - 直接从鼠标事件获取
 		onSelectionChange,
 		setSelection,
 		enabled: selectedTool === EditTools.RECTANGLE_SELECT,
@@ -111,7 +111,7 @@ export function useKonvaMouseEvent({
 		ellipseTool,
 		selectionManager,
 		konvaSelectionRenderer,
-		currentMode,
+		// 移除 currentMode - 直接从鼠标事件获取
 		onSelectionChange,
 		setSelection,
 		enabled: selectedTool === EditTools.ELLIPSE_SELECT,
@@ -122,7 +122,7 @@ export function useKonvaMouseEvent({
 		brushTool,
 		selectionManager,
 		konvaSelectionRenderer,
-		currentMode,
+		// 移除 currentMode - 直接从鼠标事件获取
 		onSelectionChange,
 		setSelection,
 		enabled: selectedTool === EditTools.BRUSH_SELECT,

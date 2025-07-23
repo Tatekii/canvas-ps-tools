@@ -9,7 +9,6 @@ interface UseKonvaEllipseHandlerProps {
   ellipseTool: EllipseSelectionTool | null
   selectionManager: SelectionManager | null
   konvaSelectionRenderer: KonvaSelectionRenderer | null
-  currentMode: SelectionMode
   onSelectionChange: (hasSelection: boolean, area?: number) => void
   setSelection: (selection: ImageData | null) => void
   enabled: boolean
@@ -35,7 +34,6 @@ export function useKonvaEllipseHandler({
   ellipseTool,
   selectionManager,
   konvaSelectionRenderer,
-  currentMode,
   onSelectionChange,
   setSelection,
   enabled
@@ -61,8 +59,9 @@ export function useKonvaEllipseHandler({
     isDrawingRef.current = false
     
     // 根据按键确定选区模式
+    // 修复：正确处理getSelectionModeFromEvent可能返回null的情况
     const eventMode = getSelectionModeFromEvent(event)
-    const actualMode = eventMode || currentMode
+    const actualMode = eventMode !== null ? eventMode : SelectionMode.NEW
     
     const success = ellipseTool.finishSelection(x, y, actualMode)
 
@@ -93,7 +92,7 @@ export function useKonvaEllipseHandler({
     } else {
       onSelectionChange(false)
     }
-  }, [enabled, ellipseTool, selectionManager, konvaSelectionRenderer, currentMode, onSelectionChange, setSelection])
+  }, [enabled, ellipseTool, selectionManager, konvaSelectionRenderer, onSelectionChange, setSelection])
 
   return {
     handleMouseDown,

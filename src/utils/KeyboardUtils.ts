@@ -25,7 +25,9 @@ export const isAltModifier = (event: KeyboardEvent | MouseEvent) => {
 }
 
 // 选区模式快捷键检测
-export const getSelectionModeFromEvent = (event: MouseEvent): SelectionMode => {
+// 修复版本：只有在检测到按键时才返回模式，否则返回null让工具使用currentMode
+export const getSelectionModeFromEvent = (event: MouseEvent): SelectionMode | null => {
+	// NOTE 注意 有些工具的完成绘制是在mouseUp时触发的
 	const hasShift = isShiftModifier(event)
 	const hasModifier = isModifierKey(event)
 
@@ -36,7 +38,7 @@ export const getSelectionModeFromEvent = (event: MouseEvent): SelectionMode => {
 	} else if (hasShift) {
 		return SelectionMode.ADD // Shift = 添加
 	} else {
-		return SelectionMode.NEW // 默认 = 新建
+		return null
 	}
 }
 

@@ -132,32 +132,45 @@ interface CanvasConfig {
 - [x] 集成 canvasStore 的视口和工作区管理
 - [x] 集成 selectionStore 的选区状态管理
 - [x] 测试基本的缩放和平移功能
+- [x] 修复 Zustand 选择器无限循环问题
+- [x] 创建 toolInstanceStore 和 imageCanvasStore
+- [x] 成功迁移工具实例管理到 store
 
-**完成情况**: 90% ✅
-**完成时间**: Phase 2 主要重构完成，视口和选区状态已迁移到 Zustand
+**完成情况**: 95% ✅
+**完成时间**: Phase 2 重构基本完成，核心功能已迁移
 
 **重构成果**:
 - ✅ 成功迁移视口状态管理 (`stageScale`, `stagePosition` → `viewport.scale`, `viewport.x/y`)
 - ✅ 成功迁移缩放控制函数 (使用 `zoomControls` 和 `panControls`)
 - ✅ 成功迁移选区状态管理 (使用 `activeSelection` 和 `selectionActions`)
 - ✅ 成功迁移 Canvas 就绪状态 (`isCanvasReady` → `canvasStore.setReady()`)
+- ✅ 成功迁移工具实例管理 (创建 `toolInstanceStore`)
+- ✅ 成功迁移图像和预览状态 (创建 `imageCanvasStore`)
+- ✅ 修复了无限循环渲染问题 (稳定的 Zustand 选择器)
 - ✅ 修复了所有编译错误，组件可以正常构建
 
-**待完成项目**:
-- [ ] 完全迁移工具状态到 toolStore (目前部分工具仍使用 useState)
-- [ ] 完全迁移图层管理到 layerStore (目前单图片模式)
-- [ ] 重构 KonvaSelectionRenderer 集成
-- [ ] 迁移剩余的 UI 状态
+**遗留问题**:
+- 选区渲染尚未完全连接到新的 store 系统 (KonvaSelectionOverlay 需要更新)
+- 工具的选区创建逻辑需要与 selectionStore 集成
 
-### 第三阶段：工具和选区系统完整重构 🔄 NEXT
-- [ ] 完全迁移工具状态管理到 toolStore
-- [ ] 重构 KonvaSelectionRenderer 以使用 selectionStore
-- [ ] 迁移工具预览状态到 toolStore
-- [ ] 完善选区操作的 store 集成
-- [ ] 测试所有选区工具的功能完整性
+### 第三阶段：工具和选区系统完整重构 🔄 IN PROGRESS
+- [x] 分析选区渲染问题 (KonvaSelectionOverlay 使用旧的 selection 变量)
+- [x] 修复 KonvaSelectionOverlay 以使用 activeSelection.mask
+- [x] 重构 SelectionManager 支持选区变化回调
+- [x] 更新工具初始化流程，集成 selectionStore 同步
+- [x] 添加测试选区功能按钮
+- [ ] 测试魔棒、套索、矩形、椭圆、笔刷选择工具
+- [ ] 实现选区预览功能
+- [ ] 完善蚂蚁线动画效果
 
-**预计时间**: 2-3 天
-**优先级**: 高 - 为多图层功能做准备
+**当前进展**: 选区系统核心重构完成 60%
+**已完成**:
+- ✅ SelectionManager 现在支持选区变化回调
+- ✅ 工具创建的选区会自动同步到 selectionStore
+- ✅ KonvaSelectionOverlay 连接到新的 store 系统
+- ✅ 添加了测试选区按钮用于验证功能
+
+**下一步**: 测试工具选区创建和渲染是否正常工作
 
 **重构成果**:
 - 状态变量从 21+ 减少到 6 个 (减少 ~75%)

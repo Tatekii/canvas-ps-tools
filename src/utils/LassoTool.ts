@@ -34,7 +34,7 @@ export class LassoTool {
     
     this.path = [[clampedX, clampedY]];
     this.isDrawing = true;
-    this.drawPath();
+    // 不再在隐藏canvas上绘制，完全依赖预览回调系统
     this.updatePreview();
   }
 
@@ -51,9 +51,24 @@ export class LassoTool {
       return;
     }
     
+    // 距离阈值优化：只有移动足够距离才添加新点
+    if (lastPoint) {
+      const dx = clampedX - lastPoint[0];
+      const dy = clampedY - lastPoint[1];
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // 如果移动距离小于2像素，跳过此点
+      if (distance < 2) {
+        return;
+      }
+    }
+    
     this.path.push([clampedX, clampedY]);
-    this.drawPath();
-    this.updatePreview();
+    
+    // 节流预览更新
+    if (this.path.length % 2 === 0) {
+      this.updatePreview();
+    }
   }
 
   finishPath(mode: SelectionMode = SelectionMode.NEW): boolean {
@@ -68,48 +83,6 @@ export class LassoTool {
     this.selectionManager.applySelection(mask, mode);
     this.clearPath();
     return true;
-  }
-
-  private drawPath() {
-    const ctx = this.canvas.getContext('2d');
-    if (!ctx || this.path.length < 1) return;
-
-    // 清除之前的绘制
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    
-    // 如果只有一个点，绘制一个小圆点
-    if (this.path.length === 1) {
-      ctx.fillStyle = '#00ff00';
-      ctx.beginPath();
-      ctx.arc(this.path[0][0], this.path[0][1], 3, 0, 2 * Math.PI);
-      ctx.fill();
-      return;
-    }
-    
-    // 绘制路径
-    ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.setLineDash([5, 5]); // 虚线效果，更清晰地显示正在绘制的路径
-    
-    ctx.beginPath();
-    ctx.moveTo(this.path[0][0], this.path[0][1]);
-    
-    for (let i = 1; i < this.path.length; i++) {
-      ctx.lineTo(this.path[i][0], this.path[i][1]);
-    }
-    
-    // 如果不在绘制状态，闭合路径并显示预览
-    if (!this.isDrawing && this.path.length > 2) {
-      ctx.closePath();
-      // 添加填充预览
-      ctx.fillStyle = 'rgba(0, 255, 0, 0.15)';
-      ctx.fill();
-    }
-    
-    ctx.stroke();
-    ctx.setLineDash([]); // 重置虚线设置
   }
 
   private createSelectionMask(): Uint8Array {
@@ -153,17 +126,16 @@ export class LassoTool {
   }
 
   // 更新预览回调
+  // 优化版本：减少数组复制开销
   private updatePreview() {
     if (this.previewCallback) {
-      this.previewCallback([...this.path], this.isDrawing);
+      this.previewCallback(this.path.slice(), this.isDrawing);
     }
   }
 
   private clearPath() {
-    const ctx = this.canvas.getContext('2d');
-    if (ctx) {
-      ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
+    // 不再清除隐藏canvas，因为那会删除图片
+    // 只清除路径数据
     this.path = [];
     this.isDrawing = false;
     this.updatePreview(); // 清除预览

@@ -9,7 +9,6 @@ interface UseKonvaRectangleHandlerProps {
   rectangleTool: RectangleSelectionTool | null
   selectionManager: SelectionManager | null
   konvaSelectionRenderer: KonvaSelectionRenderer | null
-  currentMode: SelectionMode
   onSelectionChange: (hasSelection: boolean, area?: number) => void
   setSelection: (selection: ImageData | null) => void
   enabled: boolean
@@ -35,7 +34,6 @@ export function useKonvaRectangleHandler({
   rectangleTool,
   selectionManager,
   konvaSelectionRenderer,
-  currentMode,
   onSelectionChange,
   setSelection,
   enabled
@@ -61,8 +59,9 @@ export function useKonvaRectangleHandler({
     isDrawingRef.current = false
     
     // 根据按键确定选区模式
+    // 修复：正确处理getSelectionModeFromEvent可能返回null的情况
     const eventMode = getSelectionModeFromEvent(event)
-    const actualMode = eventMode || currentMode
+    const actualMode = eventMode !== null ? eventMode : SelectionMode.NEW
     
     const success = rectangleTool.finishSelection(x, y, actualMode)
 
@@ -93,7 +92,7 @@ export function useKonvaRectangleHandler({
     } else {
       onSelectionChange(false)
     }
-  }, [enabled, rectangleTool, selectionManager, konvaSelectionRenderer, currentMode, onSelectionChange, setSelection])
+  }, [enabled, rectangleTool, selectionManager, konvaSelectionRenderer, onSelectionChange, setSelection])
 
   return {
     handleMouseDown,

@@ -39,6 +39,7 @@ export class RectangleSelectionTool {
   }
 
   // 更新矩形选择
+  // 优化版本：减少不必要的预览更新
   updateSelection(x: number, y: number) {
     if (!this.isDrawing || !this.startPoint) return;
     
@@ -46,7 +47,14 @@ export class RectangleSelectionTool {
     const clampedX = Math.max(0, Math.min(x, this.canvas.width - 1));
     const clampedY = Math.max(0, Math.min(y, this.canvas.height - 1));
     
-    this.updatePreview(clampedX, clampedY);
+    // 检查是否有实际变化，避免无意义的预览更新
+    const deltaX = Math.abs(clampedX - this.startPoint.x);
+    const deltaY = Math.abs(clampedY - this.startPoint.y);
+    
+    // 只有移动距离超过阈值才更新预览
+    if (deltaX >= 2 || deltaY >= 2) {
+      this.updatePreview(clampedX, clampedY);
+    }
   }
 
   // 完成矩形选择

@@ -64,6 +64,7 @@ export const KonvaToolPreview: React.FC<KonvaToolPreviewProps> = ({
   const animationRef = useRef<number | null>(null)
 
   // 预览动画效果
+  // 优化版本：限制动画帧率，减少CPU消耗
   useEffect(() => {
     if (!previewData || !previewData.data.isDrawing) {
       if (animationRef.current) {
@@ -73,11 +74,18 @@ export const KonvaToolPreview: React.FC<KonvaToolPreviewProps> = ({
       return
     }
 
-    const animate = () => {
-      setDashOffset(prev => {
-        const newOffset = prev + 0.5 // 动画速度
-        return newOffset >= 20 ? 0 : newOffset // 重置偏移量
-      })
+    let lastTime = 0
+    const targetFPS = 15 // 降低帧率，减少CPU消耗
+    const interval = 1000 / targetFPS
+
+    const animate = (currentTime: number) => {
+      if (currentTime - lastTime >= interval) {
+        setDashOffset(prev => {
+          const newOffset = prev + 1 // 适当调整动画步长
+          return newOffset >= 20 ? 0 : newOffset
+        })
+        lastTime = currentTime
+      }
       animationRef.current = requestAnimationFrame(animate)
     }
 

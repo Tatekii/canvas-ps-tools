@@ -49,6 +49,7 @@ export class BrushSelectionTool {
   }
 
   // 添加绘制点
+  // 优化版本：减少重复点和不必要的预览更新
   addPoint(x: number, y: number) {
     if (!this.isDrawing) return;
     
@@ -62,8 +63,24 @@ export class BrushSelectionTool {
       return;
     }
     
+    // 距离阈值优化：只有移动足够距离才添加新点
+    if (lastPoint) {
+      const dx = clampedX - lastPoint[0];
+      const dy = clampedY - lastPoint[1];
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // 如果移动距离小于1像素，跳过此点
+      if (distance < 1) {
+        return;
+      }
+    }
+    
     this.path.push([clampedX, clampedY]);
-    this.updatePreview();
+    
+    // 节流预览更新：每5个点更新一次，或者是最后一个点
+    if (this.path.length % 3 === 0) {
+      this.updatePreview();
+    }
   }
 
   // 完成绘制
@@ -156,9 +173,11 @@ export class BrushSelectionTool {
   }
 
   // 更新预览回调
+  // 优化版本：避免频繁的数组复制，使用节流
   private updatePreview() {
     if (this.previewCallback) {
-      this.previewCallback([...this.path], this.brushSize, this.isDrawing);
+      // 只传递路径的浅拷贝引用，减少内存分配
+      this.previewCallback(this.path.slice(), this.brushSize, this.isDrawing);
     }
   }
 

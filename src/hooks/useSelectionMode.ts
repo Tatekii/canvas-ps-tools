@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useKeyboardListener } from './useKeyboardListener'
 import { SelectionMode } from '../utils/SelectionTypes'
+import { EditTools } from '../constants'
 
 interface UseSelectionModeProps {
   /** 当前选择的工具 */
@@ -48,7 +49,14 @@ export function useSelectionMode({
   const [shortcutText, setShortcutText] = useState<string>('')
   
   // 检查是否应该启用键盘监听
-  const shouldEnableKeyboard = enableKeyboardControl && hasImage && (selectedTool === 'magic-wand' || selectedTool === 'lasso')
+  // 修复：为所有选择工具启用键盘快捷键
+  const shouldEnableKeyboard = enableKeyboardControl && hasImage && (
+    selectedTool === EditTools.MAGIC_WAND || 
+    selectedTool === EditTools.LASSO ||
+    selectedTool === EditTools.RECTANGLE_SELECT ||
+    selectedTool === EditTools.ELLIPSE_SELECT ||
+    selectedTool === EditTools.BRUSH_SELECT
+  )
   
   // 平台检测
   const platform = useMemo(() => 

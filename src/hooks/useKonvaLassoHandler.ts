@@ -9,7 +9,6 @@ interface UseKonvaLassoHandlerProps {
   lassoTool: LassoTool | null
   selectionManager: SelectionManager | null
   konvaSelectionRenderer: KonvaSelectionRenderer | null
-  currentMode: SelectionMode
   onSelectionChange: (hasSelection: boolean, area?: number) => void
   setSelection: (selection: ImageData | null) => void
   enabled: boolean
@@ -34,7 +33,6 @@ export function useKonvaLassoHandler({
   lassoTool,
   selectionManager,
   konvaSelectionRenderer,
-  currentMode,
   onSelectionChange,
   setSelection,
   enabled
@@ -56,8 +54,9 @@ export function useKonvaLassoHandler({
     if (!enabled || !lassoTool || !selectionManager) return
     
     // 根据按键确定选区模式
+    // 修复：正确处理getSelectionModeFromEvent可能返回null的情况
     const eventMode = getSelectionModeFromEvent(event)
-    const actualMode = eventMode || currentMode
+    const actualMode = eventMode !== null ? eventMode : SelectionMode.NEW
     
     const success = lassoTool.finishPath(actualMode)
 
@@ -88,7 +87,7 @@ export function useKonvaLassoHandler({
     } else {
       onSelectionChange(false)
     }
-  }, [enabled, lassoTool, selectionManager, konvaSelectionRenderer, currentMode, onSelectionChange, setSelection])
+  }, [enabled, lassoTool, selectionManager, konvaSelectionRenderer, onSelectionChange, setSelection])
 
   return {
     handleMouseDown,

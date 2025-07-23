@@ -118,7 +118,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 		const setImageDimensions = useSetImageDimensions()
 		const centeredPosition = useCenteredPosition()
 		const setCenteredPosition = useSetCenteredPosition() // 使用自定义Hook处理选区模式和键盘事件
-		const { currentMode, shortcutText } = useSelectionMode({
+		const { shortcutText } = useSelectionMode({
 			selectedTool,
 			hasImage: !!image,
 			enableKeyboardControl: true,
@@ -166,10 +166,23 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 
 				setHiddenCanvas(canvas)
 
+				// 创建选区变化回调，将选区数据同步到 store
+				const syncSelectionToStore = (selectionData: ImageData | null) => {
+					if (selectionData) {
+						// 将选区数据创建到 store 中
+						const bounds = { x: 0, y: 0, width: selectionData.width, height: selectionData.height }
+						selectionActions.createSelection('rectangle', 'default-layer', bounds, selectionData)
+						onSelectionChange(true)
+					} else {
+						selectionActions.clearSelection()
+						onSelectionChange(false)
+					}
+				}
+
 				// 初始化工具
-				const manager = new SelectionManager(width, height)
+				const manager = new SelectionManager(width, height, syncSelectionToStore)
 				
-				// 使用 store 初始化所有工具实例，包括预览回调
+				// 使用 store 初始化所有工具实例，包括预览回调和选区回调
 				setSelectionManager(manager)
 				initializeTools(canvas, manager, tolerance, setPreviewData)
 
@@ -207,7 +220,6 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 			brushTool,
 			selectionManager,
 			konvaSelectionRenderer: null, // 暂时设为 null，待重构
-			currentMode,
 			onSelectionChange,
 			setSelection: () => {}, // 暂时设为空函数，待重构  
 			setIsDrawing: () => {}, // 使用 tool store
@@ -324,6 +336,35 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 
 			onSelectionChange(false)
 		}, [selectionManager, konvaSelectionRenderer, onSelectionChange, selectionActions])
+
+		// 测试选区功能 - 临时调试函数
+		const createTestSelection = useCallback(() => {
+			if (imageDimensions) {
+				// 创建一个测试矩形选区
+				const bounds = { x: 50, y: 50, width: 100, height: 100 }
+				
+				// 创建测试遮罩
+				const testImageData = new ImageData(100, 100)
+				// 填充测试数据 - 全选区域
+				for (let i = 0; i < testImageData.data.length; i += 4) {
+					testImageData.data[i] = 255     // R
+					testImageData.data[i + 1] = 255 // G
+					testImageData.data[i + 2] = 255 // B
+					testImageData.data[i + 3] = 255 // A - 完全不透明表示选中
+				}
+				
+				// 使用正确的 createSelection 方法
+				const selectionId = selectionActions.createSelection(
+					'rectangle',
+					'default-layer', // 暂时使用默认图层ID
+					bounds,
+					testImageData
+				)
+				
+				console.log("已创建测试选区:", selectionId, testImageData)
+				onSelectionChange(true)
+			}
+		}, [imageDimensions, selectionActions, onSelectionChange])
 
 		// 删除选中区域
 		const deleteSelected = useCallback(() => {
@@ -538,6 +579,16 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>(
 
 				{/* 缩放控件 */}
 				<ZoomControls zoom={viewport.scale} onZoomIn={zoomIn} onZoomOut={zoomOut} onReset={resetZoom} />
+				
+				{/* 临时测试按钮 - 用于测试选区功能 */}
+				<div className="absolute bottom-4 left-4">
+					<button
+						onClick={createTestSelection}
+						className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded text-sm transition-colors duration-200"
+					>
+						测试选区
+					</button>
+				</div>
 			</div>
 		)
 	}
