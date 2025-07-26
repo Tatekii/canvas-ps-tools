@@ -3,6 +3,7 @@ import Toolbar from "./components/Toolbar"
 import ImageCanvas from "./components/ImageCanvas"
 import KonvaCanvas from "./components/KonvaCanvas"
 import PropertyPanel from "./components/PropertyPanel"
+import { LayerPanel } from "./components/LayerPanel"
 import { EditTools, EditToolTypes } from "./constants"
 
 interface ImageCanvasRef {
@@ -96,6 +97,9 @@ function App() {
 					canRedo={redoStack.length > 0}
 					hasSelection={hasSelection}
 				/>
+
+				{/* 左侧图层面板 */}
+				<LayerPanel />
 
 				{useKonva ? (
 					<KonvaCanvas

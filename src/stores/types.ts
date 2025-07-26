@@ -51,7 +51,7 @@ export interface ImageLayer {
   opacity: number // 0-1
   blendMode: BlendMode
   locked: boolean
-  zIndex: number // 图层在层级中的顺序 (越大越在上层)
+  // 移除 zIndex - 使用数组索引作为图层顺序
   
   // 尺寸信息 (基于原始图片计算)
   originalWidth: number
@@ -179,7 +179,7 @@ export interface LayerCreateOptions {
   blendMode?: BlendMode
   visible?: boolean
   locked?: boolean
-  zIndex?: number
+  // 移除 zIndex - 新图层将添加到顶部（数组末尾）
 }
 
 // 图层存储接口
@@ -212,13 +212,14 @@ export interface LayerStore {
   moveLayerDown: (layerId: string) => boolean
   moveLayerToTop: (layerId: string) => boolean
   moveLayerToBottom: (layerId: string) => boolean
+  moveLayer: (layerId: string, targetLayerId: string) => boolean
   reorderLayers: () => void
   
   // 图层查询
   getLayerById: (layerId: string) => ImageLayer | null
   getActiveLayer: () => ImageLayer | null
   getVisibleLayers: () => ImageLayer[]
-  getLayersByZIndex: () => ImageLayer[]
+  // 移除 getLayersByZIndex - 直接使用 layers 数组即可（索引越大层级越高）
   
   // 图层合并
   mergeLayers: (layerIds: string[]) => string | null
