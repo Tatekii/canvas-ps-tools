@@ -29,6 +29,14 @@ export type BlendMode =
 // 图层类型
 export type LayerType = 'image' | 'shape' | 'text' | 'adjustment'
 
+// Alpha 通道数据 - 用于保存选区为通道
+export interface AlphaChannel {
+  id: string
+  name: string
+  mask: ImageData // 通道遮罩数据
+  createdAt: Date
+}
+
 // 图片图层数据
 export interface ImageLayer {
   // 基础信息
@@ -64,19 +72,31 @@ export interface ImageLayer {
   updatedAt: Date
 }
 
-// 选区数据
+// 选区数据 - 全局唯一的选区，不属于特定图层
 export interface SelectionData {
   id: string
-  layerId: string // 所属图层ID
-  imageData: ImageData
+  type: 'rectangle' | 'ellipse' | 'lasso' | 'magic-wand' | 'brush'
+  mask: ImageData // 选区遮罩 (alpha通道表示选择程度)
   bounds: {
     x: number
     y: number
     width: number
     height: number
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
   }
-  area: number // 选区面积
+  area: number // 选区面积 (像素数)
   createdAt: Date
+  
+  // 变换信息
+  transform: {
+    x: number
+    y: number
+    scale: number
+    rotation: number
+  }
 }
 
 // 视口配置 - 用户看到的固定窗口
@@ -193,6 +213,10 @@ export interface LayerStore {
   addLayer: (imageData: ImageData, options?: LayerCreateOptions) => string
   removeLayer: (layerId: string) => boolean
   duplicateLayer: (layerId: string) => string | null
+  
+  // 图层初始化
+  initializeWithDefaultLayer: () => Promise<void>
+  addLayerFromFile: (file: File) => Promise<string>
   
   // 图层属性更新
   updateLayerTransform: (layerId: string, transform: Partial<ImageLayer['transform']>) => void

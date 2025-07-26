@@ -17,7 +17,7 @@ export interface SelectionBounds extends Rectangle {
 export interface SelectionData {
   id: string
   type: SelectionType
-  layerId: string          // 所属图层ID
+  // 移除 layerId - 选区是全局的，不属于特定图层
   bounds: SelectionBounds  // 选区边界
   mask: ImageData         // 选区遮罩 (alpha通道表示选择程度)
   area: number            // 选区面积 (像素数)
@@ -61,7 +61,6 @@ export interface SelectionStore {
   // 选区操作
   createSelection: (
     type: SelectionType, 
-    layerId: string, 
     bounds: Rectangle, 
     mask?: ImageData
   ) => string
@@ -91,7 +90,7 @@ export interface SelectionStore {
   
   // 选区反选和全选
   invertSelection: () => void
-  selectAll: (layerId: string) => void
+  selectAll: () => void
   
   // 选区边界检测
   isPointInSelection: (point: Point) => boolean
@@ -111,7 +110,7 @@ export interface SelectionStore {
   
   // 选区转换
   selectionToPath: () => Path2D | null
-  pathToSelection: (path: Path2D, layerId: string) => string
+  pathToSelection: (path: Path2D) => string
   
   // 选区存储和加载
   saveSelection: (name: string) => void
@@ -197,7 +196,7 @@ export const useSelectionStore = create<SelectionStore>()(
     selectionMode: 'new',
     
     // 选区操作
-    createSelection: (type, layerId, bounds, mask) => {
+    createSelection: (type: SelectionType, bounds: Rectangle, mask?: ImageData) => {
       const id = generateSelectionId()
       
       // 如果没有提供遮罩，根据类型和边界创建简单遮罩
@@ -228,7 +227,7 @@ export const useSelectionStore = create<SelectionStore>()(
       const selection: SelectionData = {
         id,
         type,
-        layerId,
+        // 移除 layerId - 选区是全局的
         bounds: calculateBounds(selectionMask),
         mask: selectionMask,
         area: calculateArea(selectionMask),
@@ -364,9 +363,9 @@ export const useSelectionStore = create<SelectionStore>()(
       console.log('Selection inversion not implemented yet')
     },
     
-    selectAll: (layerId) => {
-      // TODO: 实现全选
-      console.log('Select all not implemented yet', { layerId })
+    selectAll: () => {
+      // TODO: 实现全选 - 基于当前画布尺寸创建全选区
+      console.log('Select all not implemented yet')
     },
     
     // 选区边界检测
@@ -497,9 +496,9 @@ export const useSelectionStore = create<SelectionStore>()(
       return null
     },
     
-    pathToSelection: (path, layerId) => {
+    pathToSelection: (path: Path2D) => {
       // TODO: 实现路径转换为选区
-      console.log('Path to selection conversion not implemented yet', { path, layerId })
+      console.log('Path to selection conversion not implemented yet', { path })
       return generateSelectionId()
     },
     
@@ -546,6 +545,7 @@ export const useSelectionActions = () => {
   const clearSelection = useSelectionStore((state) => state.clearSelection)
   const moveSelection = useSelectionStore((state) => state.moveSelection)
   const setSelectionMode = useSelectionStore((state) => state.setSelectionMode)
+  const invertSelection = useSelectionStore((state) => state.invertSelection)
   const isPointInSelection = useSelectionStore((state) => state.isPointInSelection)
   const getSelectionBounds = useSelectionStore((state) => state.getSelectionBounds)
   const getSelectionCenter = useSelectionStore((state) => state.getSelectionCenter)
@@ -556,6 +556,7 @@ export const useSelectionActions = () => {
     clearSelection,
     moveSelection,
     setSelectionMode,
+    invertSelection,
     isPointInSelection,
     getSelectionBounds,
     getSelectionCenter

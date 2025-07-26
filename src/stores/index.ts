@@ -22,31 +22,83 @@ export {
   useViewport,
   useWorkspace,
   useCanvasReady,
-  useCoordinateTransform,
+  useTransformPoint,
+  useGetViewportBounds,
+  useIsPointInViewport,
   useZoomControls,
-  usePanControls
+  usePanControls,
+  useSetStageRef,
+  useSetReady,
+  usePanTo,
+  usePanBy,
+  useCenterView,
+  useUpdateViewportTransform
 } from './canvasStore'
 
-// 便捷 hooks 导出 - 图层相关
+// 便捷 hooks 导出 - 图层相关（核心功能）
 export {
   useLayers,
   useActiveLayer,
   useVisibleLayers,
-  useLayerActions,
-  useLayerReorder
+  // 图层操作
+  useAddLayer,
+  useRemoveLayer,
+  useDuplicateLayer,
+  useSetActiveLayer,
+  useUpdateLayerTransform,
+  useUpdateLayerOpacity,
+  useUpdateLayerVisibility,
+  useRenameLayer,
+  // 图层堆叠顺序
+  useMoveLayerUp,
+  useMoveLayerDown,
+  useMoveLayerToTop,
+  useMoveLayerToBottom,
+  useMoveLayerToIndex,
+  useReorderLayers
 } from './layerStore'
 
 // 便捷 hooks 导出 - 工具相关
 export {
+  // 新的工具系统导出
+  useCurrentTool,
   useActiveTool,
+  useCurrentBehavior,
   useActiveSelectionTool,
+  useEffectiveTool,
+  // 配置相关
   useBrushConfig,
   useEraserConfig,
   useSelectionConfig,
   useTextConfig,
-  useKeyboardState,
+  // 键盘状态
+  useIsSpacePressed,
+  useIsAltPressed,
+  useIsShiftPressed,
+  useIsCtrlPressed,
+  // 操作方法
+  useSetTool,
+  useSetBehavior,
+  useSetSelectionTool,
+  useSetDrawingTool,
+  useSetActiveTool,
+  useSetActiveSelectionTool,
+  useUpdateBrushConfig,
+  useUpdateEraserConfig,
+  useUpdateSelectionConfig,
+  useUpdateTextConfig,
+  useSetKeyPressed,
+  useResetToolConfigs,
   useToolActions,
-  useEffectiveTool
+  // 类型导出
+  type BaseToolType,
+  type ToolBehavior,
+  type ToolState,
+  type SelectionToolType,
+  type DrawingToolType,
+  TOOL_CAPABILITIES,
+  createToolState,
+  toolSupports
 } from './toolStore'
 
 // 便捷 hooks 导出 - 选区相关
@@ -56,14 +108,11 @@ export {
   useMarchingAnts,
   useSelectionMode,
   useSelectionActions,
-  useSelectionHistory,
-  useMarchingAntsControls
+  useSelectionHistory
 } from './selectionStore'
 
-// 工具类型导出
+// 工具配置类型导出（避免重复）
 export type {
-  ToolType,
-  SelectionToolType,
   BrushToolConfig,
   EraserToolConfig,
   SelectionToolConfig,

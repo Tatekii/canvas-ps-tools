@@ -103,6 +103,125 @@ export const useLayerStore = create<LayerStore>()(
 			return duplicatedLayerId
 		},
 
+		// 图层初始化
+		initializeWithDefaultLayer: async () => {
+			// 先清空现有图层
+			set({ layers: [], activeLayerId: null })
+			
+			try {
+				// 加载默认图片
+				const img = new Image()
+				img.src = '/test.png'
+				
+				await new Promise((resolve, reject) => {
+					img.onload = resolve
+					img.onerror = reject
+				})
+				
+				// 创建画布并绘制图片
+				const canvas = document.createElement('canvas')
+				const ctx = canvas.getContext('2d')!
+				
+				const maxWidth = 800
+				const maxHeight = 600
+				let { width, height } = img
+				
+				// 计算缩放比例
+				const scale = Math.min(maxWidth / width, maxHeight / height, 1)
+				width *= scale
+				height *= scale
+				
+				canvas.width = width
+				canvas.height = height
+				
+				// 设置白色背景
+				ctx.fillStyle = 'white'
+				ctx.fillRect(0, 0, width, height)
+				
+				// 绘制图片
+				ctx.drawImage(img, 0, 0, width, height)
+				
+				// 获取图片数据
+				const imageData = ctx.getImageData(0, 0, width, height)
+				
+				// 创建默认图层
+				const defaultLayerId = get().addLayer(imageData, {
+					name: '默认图层',
+					transform: {
+						x: 0,
+						y: 0
+					}
+				})
+				
+				// 设置为活动图层
+				set({ activeLayerId: defaultLayerId })
+				
+			} catch (error) {
+				console.error('Failed to load default image:', error)
+			}
+		},
+
+		// 从文件创建图层
+		addLayerFromFile: async (file: File) => {
+			try {
+				const img = new Image()
+				const url = URL.createObjectURL(file)
+				img.src = url
+				
+				await new Promise((resolve, reject) => {
+					img.onload = resolve
+					img.onerror = reject
+				})
+				
+				// 创建画布并绘制图片
+				const canvas = document.createElement('canvas')
+				const ctx = canvas.getContext('2d')!
+				
+				const maxWidth = 800
+				const maxHeight = 600
+				let { width, height } = img
+				
+				// 计算缩放比例
+				const scale = Math.min(maxWidth / width, maxHeight / height, 1)
+				width *= scale
+				height *= scale
+				
+				canvas.width = width
+				canvas.height = height
+				
+				// 设置白色背景
+				ctx.fillStyle = 'white'
+				ctx.fillRect(0, 0, width, height)
+				
+				// 绘制图片
+				ctx.drawImage(img, 0, 0, width, height)
+				
+				// 获取图片数据
+				const imageData = ctx.getImageData(0, 0, width, height)
+				
+				// 创建新图层
+				const layerId = get().addLayer(imageData, {
+					name: file.name.replace(/\.[^/.]+$/, ''), // 移除文件扩展名
+					transform: {
+						x: 0,
+						y: 0
+					}
+				})
+				
+				// 设置为活动图层
+				set({ activeLayerId: layerId })
+				
+				// 清理URL
+				URL.revokeObjectURL(url)
+				
+				return layerId
+				
+			} catch (error) {
+				console.error('Failed to load image from file:', error)
+				throw error
+			}
+		},
+
 		// 图层属性更新
 		updateLayerTransform: (layerId: string, transform: Partial<ImageLayer["transform"]>) => {
 			set((state) => ({

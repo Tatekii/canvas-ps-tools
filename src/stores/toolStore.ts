@@ -2,24 +2,69 @@ import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 
 /**
- * 工具类型定义
+ * 工具类型定义 - 重新设计的架构
+ * 工具是基类，行为模式决定工具的具体操作
  */
-export type ToolType = 
-  | 'selection'      // 选择工具 (包含矩形、椭圆、套索、魔棒、笔刷选择)
-  | 'brush'          // 笔刷工具
-  | 'eraser'         // 橡皮擦工具
-  | 'text'           // 文字工具
-  | 'shape'          // 形状工具
-  | 'eyedropper'     // 吸管工具
-  | 'hand'           // 抓手工具 (平移)
-  | 'zoom'           // 缩放工具
 
-export type SelectionToolType =
-  | 'rectangle'      // 矩形选择
-  | 'ellipse'        // 椭圆选择  
-  | 'lasso'          // 套索选择
-  | 'magic-wand'     // 魔棒选择
-  | 'brush'          // 笔刷选择
+// 基础工具类型 - 这些是具体的工具
+export type BaseToolType = 
+  | 'rectangle'      // 矩形工具 (可选择/可绘制)
+  | 'ellipse'        // 椭圆工具 (可选择/可绘制)
+  | 'lasso'          // 套索工具 (仅选择)
+  | 'magic-wand'     // 魔棒工具 (仅选择)
+  | 'brush'          // 笔刷工具 (可选择/可绘制)
+  | 'eraser'         // 橡皮擦工具 (仅绘制)
+  | 'text'           // 文字工具 (仅绘制)
+  | 'eyedropper'     // 吸管工具 (仅取色)
+  | 'hand'           // 抓手工具 (仅平移)
+  | 'zoom'           // 缩放工具 (仅缩放)
+
+// 工具行为模式 - 决定工具的操作方式
+export type ToolBehavior = 
+  | 'select'         // 选择模式 - 创建选区
+  | 'draw'           // 绘制模式 - 在图层上绘制
+  | 'erase'          // 擦除模式 - 擦除像素
+  | 'sample'         // 取样模式 - 获取颜色
+  | 'transform'      // 变换模式 - 移动/缩放视图
+
+// 组合的工具状态 - 工具 + 行为模式
+export interface ToolState {
+  tool: BaseToolType
+  behavior: ToolBehavior
+}
+
+// 工具能力映射 - 定义每个工具支持的行为
+export const TOOL_CAPABILITIES: Record<BaseToolType, ToolBehavior[]> = {
+  'rectangle': ['select', 'draw'],      // 矩形可以选择或绘制矩形
+  'ellipse': ['select', 'draw'],        // 椭圆可以选择或绘制椭圆
+  'lasso': ['select'],                  // 套索只能选择
+  'magic-wand': ['select'],             // 魔棒只能选择
+  'brush': ['select', 'draw'],          // 笔刷可以选择或绘制
+  'eraser': ['erase'],                  // 橡皮擦只能擦除
+  'text': ['draw'],                     // 文字只能绘制
+  'eyedropper': ['sample'],             // 吸管只能取样
+  'hand': ['transform'],                // 抓手只能变换视图
+  'zoom': ['transform']                 // 缩放只能变换视图
+}
+
+// 便捷类型 - 向后兼容
+export type SelectionToolType = Extract<BaseToolType, 'rectangle' | 'ellipse' | 'lasso' | 'magic-wand' | 'brush'>
+export type DrawingToolType = Extract<BaseToolType, 'rectangle' | 'ellipse' | 'brush' | 'eraser' | 'text'>
+
+// 工具组合的便捷函数
+export const createToolState = (tool: BaseToolType, behavior?: ToolBehavior): ToolState => {
+  const supportedBehaviors = TOOL_CAPABILITIES[tool]
+  const finalBehavior = behavior && supportedBehaviors.includes(behavior) 
+    ? behavior 
+    : supportedBehaviors[0] // 默认使用第一个支持的行为
+  
+  return { tool, behavior: finalBehavior }
+}
+
+// 检查工具是否支持某种行为
+export const toolSupports = (tool: BaseToolType, behavior: ToolBehavior): boolean => {
+  return TOOL_CAPABILITIES[tool].includes(behavior)
+}
 
 /**
  * 工具参数配置
@@ -63,9 +108,8 @@ export interface TextToolConfig {
  * 工具状态存储接口
  */
 export interface ToolStore {
-  // 当前工具状态
-  activeTool: ToolType
-  activeSelectionTool: SelectionToolType
+  // 当前工具状态 - 使用新的工具状态系统
+  currentTool: ToolState
   
   // 工具配置
   brushConfig: BrushToolConfig
@@ -79,9 +123,13 @@ export interface ToolStore {
   isShiftPressed: boolean    // Shift键按下 (约束操作)
   isCtrlPressed: boolean     // Ctrl/Cmd键按下 (复制等)
   
-  // 工具操作
-  setActiveTool: (tool: ToolType) => void
-  setActiveSelectionTool: (tool: SelectionToolType) => void
+  // 工具操作 - 重新设计的API
+  setTool: (tool: BaseToolType, behavior?: ToolBehavior) => void
+  setBehavior: (behavior: ToolBehavior) => void
+  
+  // 便捷的工具切换方法
+  setSelectionTool: (tool: SelectionToolType) => void
+  setDrawingTool: (tool: DrawingToolType) => void
   
   // 配置更新
   updateBrushConfig: (config: Partial<BrushToolConfig>) => void
@@ -144,9 +192,8 @@ const DEFAULT_TEXT_CONFIG: TextToolConfig = {
  */
 export const useToolStore = create<ToolStore>()(
   subscribeWithSelector((set, get) => ({
-    // 初始状态
-    activeTool: 'selection',
-    activeSelectionTool: 'rectangle',
+    // 初始状态 - 使用新的工具状态系统
+    currentTool: createToolState('rectangle', 'select'), // 默认矩形选择工具
     
     // 工具配置
     brushConfig: { ...DEFAULT_BRUSH_CONFIG },
@@ -160,17 +207,32 @@ export const useToolStore = create<ToolStore>()(
     isShiftPressed: false,
     isCtrlPressed: false,
     
-    // 工具操作
-    setActiveTool: (tool: ToolType) => {
-      set({ activeTool: tool })
+    // 工具操作 - 重新设计的API
+    setTool: (tool: BaseToolType, behavior?: ToolBehavior) => {
+      const newToolState = createToolState(tool, behavior)
+      set({ currentTool: newToolState })
     },
     
-    setActiveSelectionTool: (tool: SelectionToolType) => {
-      set({ activeSelectionTool: tool })
-      // 自动切换到选择工具
-      if (get().activeTool !== 'selection') {
-        set({ activeTool: 'selection' })
+    setBehavior: (behavior: ToolBehavior) => {
+      const { currentTool } = get()
+      if (toolSupports(currentTool.tool, behavior)) {
+        set({ 
+          currentTool: { ...currentTool, behavior } 
+        })
+      } else {
+        console.warn(`Tool ${currentTool.tool} does not support behavior ${behavior}`)
       }
+    },
+    
+    // 便捷的工具切换方法
+    setSelectionTool: (tool: SelectionToolType) => {
+      const newToolState = createToolState(tool, 'select')
+      set({ currentTool: newToolState })
+    },
+    
+    setDrawingTool: (tool: DrawingToolType) => {
+      const newToolState = createToolState(tool, 'draw')
+      set({ currentTool: newToolState })
     },
     
     // 配置更新
@@ -245,14 +307,26 @@ export const useToolStore = create<ToolStore>()(
 )
 
 /**
- * 便捷的选择器 hooks
+ * 便捷的选择器 hooks - 重新设计的API
  */
 
-// 获取当前工具
-export const useActiveTool = () => useToolStore((state) => state.activeTool)
+// 获取当前工具状态
+export const useCurrentTool = () => useToolStore((state) => state.currentTool)
 
-// 获取当前选择工具
-export const useActiveSelectionTool = () => useToolStore((state) => state.activeSelectionTool)
+// 获取当前工具 (向后兼容)
+export const useActiveTool = () => useToolStore((state) => state.currentTool.tool)
+
+// 获取当前行为 
+export const useCurrentBehavior = () => useToolStore((state) => state.currentTool.behavior)
+
+// 获取当前选择工具 (向后兼容) - 仅当行为是选择时
+export const useActiveSelectionTool = () => useToolStore((state) => {
+  const { currentTool } = state
+  if (currentTool.behavior === 'select') {
+    return currentTool.tool as SelectionToolType
+  }
+  return 'rectangle' // 默认值
+})
 
 // 获取工具配置
 export const useBrushConfig = () => useToolStore((state) => state.brushConfig)
@@ -266,9 +340,16 @@ export const useIsAltPressed = () => useToolStore((state) => state.isAltPressed)
 export const useIsShiftPressed = () => useToolStore((state) => state.isShiftPressed)
 export const useIsCtrlPressed = () => useToolStore((state) => state.isCtrlPressed)
 
-// Individual tool action hooks for stable references
-export const useSetActiveTool = () => useToolStore((state) => state.setActiveTool)
-export const useSetActiveSelectionTool = () => useToolStore((state) => state.setActiveSelectionTool)
+// Individual tool action hooks for stable references - 重新设计的API
+export const useSetTool = () => useToolStore((state) => state.setTool)
+export const useSetBehavior = () => useToolStore((state) => state.setBehavior)
+export const useSetSelectionTool = () => useToolStore((state) => state.setSelectionTool)
+export const useSetDrawingTool = () => useToolStore((state) => state.setDrawingTool)
+
+// 向后兼容的hooks
+export const useSetActiveTool = () => useToolStore((state) => state.setTool)
+export const useSetActiveSelectionTool = () => useToolStore((state) => state.setSelectionTool)
+
 export const useUpdateBrushConfig = () => useToolStore((state) => state.updateBrushConfig)
 export const useUpdateEraserConfig = () => useToolStore((state) => state.updateEraserConfig)
 export const useUpdateSelectionConfig = () => useToolStore((state) => state.updateSelectionConfig)
@@ -278,17 +359,49 @@ export const useResetToolConfigs = () => useToolStore((state) => state.resetTool
 
 // 计算出的工具状态 (考虑快捷键临时切换)
 export const useEffectiveTool = () => useToolStore((state) => {
-  const { activeTool, isSpacePressed, isAltPressed } = state
+  const { currentTool, isSpacePressed, isAltPressed } = state
   
   // 空格键临时切换到抓手工具
   if (isSpacePressed) {
-    return 'hand'
+    return createToolState('hand', 'transform')
   }
   
   // Alt键临时切换到吸管工具 (仅在笔刷/橡皮擦工具时)
-  if (isAltPressed && (activeTool === 'brush' || activeTool === 'eraser')) {
-    return 'eyedropper'
+  if (isAltPressed && (currentTool.tool === 'brush' || currentTool.tool === 'eraser')) {
+    return createToolState('eyedropper', 'sample')
   }
   
-  return activeTool
+  return currentTool
 })
+
+// 合并的工具操作 hooks - 重新设计的API
+export const useToolActions = () => {
+  const setTool = useToolStore((state) => state.setTool)
+  const setBehavior = useToolStore((state) => state.setBehavior)
+  const setSelectionTool = useToolStore((state) => state.setSelectionTool)
+  const setDrawingTool = useToolStore((state) => state.setDrawingTool)
+  const updateBrushConfig = useToolStore((state) => state.updateBrushConfig)
+  const updateEraserConfig = useToolStore((state) => state.updateEraserConfig)
+  const updateSelectionConfig = useToolStore((state) => state.updateSelectionConfig)
+  const updateTextConfig = useToolStore((state) => state.updateTextConfig)
+  const setKeyPressed = useToolStore((state) => state.setKeyPressed)
+  const resetToolConfigs = useToolStore((state) => state.resetToolConfigs)
+  
+  return {
+    // 新的API
+    setTool,
+    setBehavior,
+    setSelectionTool,
+    setDrawingTool,
+    // 向后兼容的方法
+    setActiveTool: setTool,
+    setActiveSelectionTool: setSelectionTool,
+    // 配置方法
+    updateBrushConfig,
+    updateEraserConfig,
+    updateSelectionConfig,
+    updateTextConfig,
+    setKeyPressed,
+    resetToolConfigs
+  }
+}
