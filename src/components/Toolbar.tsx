@@ -11,7 +11,6 @@ import {
 	Type,
 	Pipette,
 	Hand,
-	ZoomIn,
 	Lasso,
 	Wand2,
 	MousePointer,
@@ -41,8 +40,7 @@ const toolConfigs: {
 	{ tool: 'eraser', icon: Eraser, name: "橡皮擦", defaultBehavior: 'erase', color: 'red' },
 	{ tool: 'text', icon: Type, name: "文字工具", defaultBehavior: 'draw', color: 'green' },
 	{ tool: 'eyedropper', icon: Pipette, name: "吸管工具", defaultBehavior: 'sample', color: 'yellow' },
-	{ tool: 'hand', icon: Hand, name: "抓手工具", defaultBehavior: 'transform', color: 'gray' },
-	{ tool: 'zoom', icon: ZoomIn, name: "缩放工具", defaultBehavior: 'transform', color: 'purple' },
+	{ tool: 'hand', icon: Hand, name: "抓手工具", defaultBehavior: 'transform', color: 'gray' }
 ]
 
 const Toolbar: React.FC = () => {

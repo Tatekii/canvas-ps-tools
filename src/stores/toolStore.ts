@@ -17,7 +17,6 @@ export type BaseToolType =
   | 'text'           // 文字工具 (仅绘制)
   | 'eyedropper'     // 吸管工具 (仅取色)
   | 'hand'           // 抓手工具 (仅平移)
-  | 'zoom'           // 缩放工具 (仅缩放)
 
 // 工具行为模式 - 决定工具的操作方式
 export type ToolBehavior = 
@@ -44,7 +43,6 @@ export const TOOL_CAPABILITIES: Record<BaseToolType, ToolBehavior[]> = {
   'text': ['draw'],                     // 文字只能绘制
   'eyedropper': ['sample'],             // 吸管只能取样
   'hand': ['transform'],                // 抓手只能变换视图
-  'zoom': ['transform']                 // 缩放只能变换视图
 }
 
 // 便捷类型 - 向后兼容

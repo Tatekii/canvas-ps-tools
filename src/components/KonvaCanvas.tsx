@@ -1,7 +1,8 @@
-import React, { useRef, useEffect, useCallback, useState } from "react"
+import React, { useRef, useEffect, useCallback, useState, startTransition } from "react"
 import { Stage } from "react-konva"
 import { KonvaEventObject } from "konva/lib/Node"
 import Konva from "konva"
+import { throttle } from "radash"
 import { ZoomControls } from "./ZoomControls"
 import { KonvaToolPreview } from "./KonvaToolPreview"
 import { KonvaLayerRenderer } from "./KonvaLayerRenderer"
@@ -11,6 +12,7 @@ import { useSelectionActions } from "../stores/selectionStore"
 import { useActiveSelection } from "../stores/selectionStore"
 import { useLayerStore } from "../stores/layerStore"
 import { KonvaSelectionOverlay } from "./KonvaSelectionOverlay"
+import { useActiveTool } from "../stores"
 
 interface KonvaCanvasRef {}
 
@@ -25,6 +27,8 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 
 	const selectionActions = useSelectionActions()
 	const activeSelection = useActiveSelection()
+
+	const activeTool = useActiveTool()
 
 	// 图层系统
 	const layerStore = useLayerStore()
@@ -72,9 +76,12 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 	const dragStart = useRef({ x: 0, y: 0, stageX: 0, stageY: 0 })
 
 	// 使用统一的鼠标事件处理 - 只更新 store，让 Stage 受控
-	const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
-		// 检查是否点击在空白区域（Stage本身）
-		if (e.target === e.target.getStage()) {
+	const handleMouseDown = useCallback(
+		(e: KonvaEventObject<MouseEvent>) => {
+			// 检查是否点击在空白区域（Stage本身）
+
+			if (activeTool !== "hand") return
+
 			setIsDragging(true)
 			const stage = e.target.getStage()
 			if (stage) {
@@ -83,38 +90,57 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 					dragStart.current = {
 						x: pointer.x,
 						y: pointer.y,
-						stageX: viewport.x,  // 使用 store 中的位置
+						stageX: viewport.x, // 使用 store 中的位置
 						stageY: viewport.y,
 					}
 				}
 			}
-		}
-	}, [viewport.x, viewport.y])
-	
-	const handleMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
-		if (!isDragging) return
-		
-		const stage = e.target.getStage()
-		if (!stage) return
-		
-		const pointer = stage.getPointerPosition()
-		if (!pointer) return
-		
-		const deltaX = pointer.x - dragStart.current.x
-		const deltaY = pointer.y - dragStart.current.y
-		
-		const newPos = {
-			x: dragStart.current.stageX + deltaX,
-			y: dragStart.current.stageY + deltaY,
-		}
-		
-		// 只更新 store，Stage 会通过受控属性自动更新
-		updateViewportTransform({
-			x: newPos.x,
-			y: newPos.y,
+		},
+		[activeTool, viewport.x, viewport.y]
+	)
+
+	// 性能优化：使用 radash throttle 创建节流函数
+	const throttledMouseMove = useRef(
+		throttle({ interval: 16 }, (
+			e: KonvaEventObject<MouseEvent>, 
+			activeTool: string, 
+			isDragging: boolean, 
+			dragStart: { x: number; y: number; stageX: number; stageY: number }
+		) => {
+			if (activeTool !== "hand") return
+			if (!isDragging) return
+
+			const stage = e.target.getStage()
+			if (!stage) return
+
+			const pointer = stage.getPointerPosition()
+			if (!pointer) return
+
+			const deltaX = pointer.x - dragStart.x
+			const deltaY = pointer.y - dragStart.y
+
+			const newPos = {
+				x: dragStart.stageX + deltaX,
+				y: dragStart.stageY + deltaY,
+			}
+
+			// 只更新 store，Stage 会通过受控属性自动更新
+			startTransition(() => {
+				updateViewportTransform({
+					x: newPos.x,
+					y: newPos.y,
+				})
+			})
 		})
-	}, [isDragging, updateViewportTransform])
+	).current
 	
+	const handleMouseMove = useCallback(
+		(e: KonvaEventObject<MouseEvent>) => {
+			throttledMouseMove(e, activeTool, isDragging, dragStart.current)
+		},
+		[activeTool, isDragging, throttledMouseMove]
+	)
+
 	const handleMouseUp = useCallback(() => {
 		setIsDragging(false)
 	}, [])
@@ -181,19 +207,22 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 		console.log("全选功能待图层系统完善后实现")
 	}, [])
 
-	// 处理鼠标滚轮缩放 - 只更新 store，让 Stage 受控
-	const handleWheel = useCallback(
-		(e: KonvaEventObject<WheelEvent>) => {
+	// 处理鼠标滚轮缩放 - 使用 radash throttle
+	const throttledWheelHandler = useRef(
+		throttle({ interval: 16 }, (
+			e: KonvaEventObject<WheelEvent>, 
+			stage: Konva.Stage | null, 
+			viewportData: { scale: number; x: number; y: number }
+		) => {
 			e.evt.preventDefault()
 
-			if (!stageRef.current) return
+			if (!stage) return
 
-			const stage = stageRef.current
 			const pointer = stage.getPointerPosition()
 			if (!pointer) return
 
 			const scaleBy = 1.05
-			const oldScale = viewport.scale  // 使用 store 中的缩放值
+			const oldScale = viewportData.scale // 使用 store 中的缩放值
 			const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
 
 			// 限制缩放范围
@@ -201,8 +230,8 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 
 			// 计算新的位置以保持鼠标位置不变
 			const mousePointTo = {
-				x: (pointer.x - viewport.x) / oldScale,  // 使用 store 中的位置
-				y: (pointer.y - viewport.y) / oldScale,
+				x: (pointer.x - viewportData.x) / oldScale, // 使用 store 中的位置
+				y: (pointer.y - viewportData.y) / oldScale,
 			}
 
 			const newPos = {
@@ -211,13 +240,21 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 			}
 
 			// 只更新 store，Stage 会通过受控属性自动更新
-			updateViewportTransform({
-				x: newPos.x,
-				y: newPos.y,
-				scale: clampedScale,
+			startTransition(() => {
+				updateViewportTransform({
+					x: newPos.x,
+					y: newPos.y,
+					scale: clampedScale,
+				})
 			})
+		})
+	).current
+	
+	const handleWheel = useCallback(
+		(e: KonvaEventObject<WheelEvent>) => {
+			throttledWheelHandler(e, stageRef.current, viewport)
 		},
-		[viewport.scale, viewport.x, viewport.y, updateViewportTransform]
+		[throttledWheelHandler, viewport]
 	)
 
 	// 文件上传按钮点击
@@ -228,7 +265,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 	return (
 		<div ref={containerRef} className="relative w-full h-full bg-gray-100 overflow-hidden">
 			{/* 隐藏的文件输入 */}
-			<input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+			{/* <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" /> */}
 
 			{/* Konva舞台 */}
 			<Stage
@@ -244,6 +281,9 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
 				className="bg-gray-200"
+				// 性能优化
+				perfectDrawEnabled={false}
+				shadowForStrokeEnabled={false}
 			>
 				{/* 图层渲染器 */}
 				<KonvaLayerRenderer />

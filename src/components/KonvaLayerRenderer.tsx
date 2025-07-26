@@ -62,7 +62,12 @@ export const KonvaLayerRenderer: React.FC<KonvaLayerRendererProps> = () => {
         opacity={layer.opacity}
         // 交互属性
         listening={isActive && !layer.locked}
-        draggable={isActive && !layer.locked}
+        // TODO: 图层级别的拖拽移动功能 - 暂时禁用，优先实现 Stage 级别的移动和缩放
+        // draggable={isActive && !layer.locked}
+        draggable={false}
+        // 性能优化
+        perfectDrawEnabled={false}
+        shadowForStrokeEnabled={false}
       >
         {/* 图像层 - 显示图层的实际内容 */}
         <KonvaImage
@@ -74,16 +79,26 @@ export const KonvaLayerRenderer: React.FC<KonvaLayerRendererProps> = () => {
           listening={false} // 图像本身不响应事件，由 Group 处理
           // 暂时移除混合模式，等Konva更新支持
           // globalCompositeOperation={layer.blendMode}
+          // 性能优化
+          perfectDrawEnabled={false}
+          shadowForStrokeEnabled={false}
         />
 
         {/* 编辑层内容 - 只在激活时显示 */}
         {isActive && (
           <>
-            {/* 这里将来可以添加更多编辑内容：
-                - 该图层的画笔预览  
-                - 该图层的变换控制点
-                - 该图层的蒙版编辑
-                - 图层边界框
+            {/* TODO: 图层级别的编辑功能 - 待 Stage 级别功能完善后实现
+                功能规划：
+                - 图层移动工具（拖拽整个图层）
+                - 图层变换控制点（缩放、旋转）
+                - 图层蒙版编辑
+                - 图层边界框显示
+                - 图层专用的画笔预览
+                
+                架构策略：
+                1. 优先完善 Stage 级别的移动和缩放（全局视图控制）
+                2. 然后实现图层级别的精确编辑（内容编辑）
+                3. 避免两套移动系统冲突
             */}
           </>
         )}
