@@ -169,8 +169,6 @@ export const useCanvasStore = create<CanvasState>()(
       })),
     
     updateViewportTransform: (transform) => {
-      const { stageRef } = get()
-      
       set((state) => {
         const newViewport = {
           ...state.viewport,
@@ -185,20 +183,7 @@ export const useCanvasStore = create<CanvasState>()(
           )
         }
         
-        // 同步到 Konva Stage
-        if (stageRef?.current) {
-          if (newViewport.scale !== undefined) {
-            stageRef.current.scale({ x: newViewport.scale, y: newViewport.scale })
-          }
-          if (newViewport.x !== undefined || newViewport.y !== undefined) {
-            stageRef.current.position({ 
-              x: newViewport.x ?? state.viewport.x, 
-              y: newViewport.y ?? state.viewport.y 
-            })
-          }
-          stageRef.current.batchDraw()
-        }
-        
+        // Stage 通过受控属性自动更新，不需要手动同步
         return { viewport: newViewport }
       })
     },
@@ -293,12 +278,10 @@ export const useCanvasStore = create<CanvasState>()(
     setStageRef: (ref) => set({ stageRef: ref }),
     setReady: (ready) => set({ isReady: ready }),
     
-    // 缩放操作
+    // 缩放操作 - 简化为只更新 store 状态
     zoomIn: (center) => {
       const state = get()
-      const { viewport, stageRef } = state
-      
-      if (!stageRef?.current) return
+      const { viewport } = state
       
       const scaleBy = CANVAS_CONFIG.viewport.scaleStep
       const oldScale = viewport.scale
@@ -323,19 +306,20 @@ export const useCanvasStore = create<CanvasState>()(
         y: zoomCenter.y - mousePointTo.y * newScale,
       }
       
-      // 更新状态
-      get().updateViewportTransform({
-        scale: newScale,
-        x: newPos.x,
-        y: newPos.y
-      })
+      // 只更新状态，Stage 通过受控属性自动更新
+      set((state) => ({
+        viewport: {
+          ...state.viewport,
+          scale: newScale,
+          x: newPos.x,
+          y: newPos.y
+        }
+      }))
     },
     
     zoomOut: (center) => {
       const state = get()
-      const { viewport, stageRef } = state
-      
-      if (!stageRef?.current) return
+      const { viewport } = state
       
       const scaleBy = CANVAS_CONFIG.viewport.scaleStep
       const oldScale = viewport.scale
@@ -360,12 +344,15 @@ export const useCanvasStore = create<CanvasState>()(
         y: zoomCenter.y - mousePointTo.y * newScale,
       }
       
-      // 更新状态
-      get().updateViewportTransform({
-        scale: newScale,
-        x: newPos.x,
-        y: newPos.y
-      })
+      // 只更新状态，Stage 通过受控属性自动更新
+      set((state) => ({
+        viewport: {
+          ...state.viewport,
+          scale: newScale,
+          x: newPos.x,
+          y: newPos.y
+        }
+      }))
     },
     
     zoomToFit: (bounds) => {
@@ -384,20 +371,27 @@ export const useCanvasStore = create<CanvasState>()(
     },
     
     resetZoom: () => {
-      get().resetViewport()
+      const defaultViewport = { ...DEFAULT_VIEWPORT }
+      set({ viewport: defaultViewport })
     },
     
-    // 平移操作
+    // 平移操作 - 简化为只更新 store 状态
     panTo: (point) => {
-      get().updateViewportTransform({ x: point.x, y: point.y })
+      set((state) => ({
+        viewport: { ...state.viewport, x: point.x, y: point.y }
+      }))
     },
     
     panBy: (delta) => {
       const { viewport } = get()
-      get().updateViewportTransform({
+      const newPos = {
         x: viewport.x + delta.x,
         y: viewport.y + delta.y
-      })
+      }
+      
+      set((state) => ({
+        viewport: { ...state.viewport, x: newPos.x, y: newPos.y }
+      }))
     },
     
     centerView: () => {
@@ -406,7 +400,10 @@ export const useCanvasStore = create<CanvasState>()(
         x: (workspace.bounds.width - CANVAS_CONFIG.viewport.width) / 2,
         y: (workspace.bounds.height - CANVAS_CONFIG.viewport.height) / 2
       }
-      get().panTo(centeredPos)
+      
+      set((state) => ({
+        viewport: { ...state.viewport, x: centeredPos.x, y: centeredPos.y }
+      }))
     },
     
     // 坐标转换 (使用当前状态)

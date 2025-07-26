@@ -67,10 +67,57 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 		}
 	}, [setStageRef])
 
-	// 使用统一的鼠标事件处理Hook - 暂时简化
-	const handleMouseDown = useCallback(() => {}, [])
-	const handleMouseMove = useCallback(() => {}, [])
-	const handleMouseUp = useCallback(() => {}, [])
+	// 拖拽状态
+	const [isDragging, setIsDragging] = useState(false)
+	const dragStart = useRef({ x: 0, y: 0, stageX: 0, stageY: 0 })
+
+	// 使用统一的鼠标事件处理 - 只更新 store，让 Stage 受控
+	const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
+		// 检查是否点击在空白区域（Stage本身）
+		if (e.target === e.target.getStage()) {
+			setIsDragging(true)
+			const stage = e.target.getStage()
+			if (stage) {
+				const pointer = stage.getPointerPosition()
+				if (pointer) {
+					dragStart.current = {
+						x: pointer.x,
+						y: pointer.y,
+						stageX: viewport.x,  // 使用 store 中的位置
+						stageY: viewport.y,
+					}
+				}
+			}
+		}
+	}, [viewport.x, viewport.y])
+	
+	const handleMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
+		if (!isDragging) return
+		
+		const stage = e.target.getStage()
+		if (!stage) return
+		
+		const pointer = stage.getPointerPosition()
+		if (!pointer) return
+		
+		const deltaX = pointer.x - dragStart.current.x
+		const deltaY = pointer.y - dragStart.current.y
+		
+		const newPos = {
+			x: dragStart.current.stageX + deltaX,
+			y: dragStart.current.stageY + deltaY,
+		}
+		
+		// 只更新 store，Stage 会通过受控属性自动更新
+		updateViewportTransform({
+			x: newPos.x,
+			y: newPos.y,
+		})
+	}, [isDragging, updateViewportTransform])
+	
+	const handleMouseUp = useCallback(() => {
+		setIsDragging(false)
+	}, [])
 
 	// 加载默认图层
 	const loadDefaultImage = useCallback(async () => {
@@ -134,18 +181,19 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 		console.log("全选功能待图层系统完善后实现")
 	}, [])
 
-	// 处理鼠标滚轮缩放
+	// 处理鼠标滚轮缩放 - 只更新 store，让 Stage 受控
 	const handleWheel = useCallback(
 		(e: KonvaEventObject<WheelEvent>) => {
 			e.evt.preventDefault()
 
 			if (!stageRef.current) return
 
-			const pointer = stageRef.current.getPointerPosition()
+			const stage = stageRef.current
+			const pointer = stage.getPointerPosition()
 			if (!pointer) return
 
 			const scaleBy = 1.05
-			const oldScale = viewport.scale
+			const oldScale = viewport.scale  // 使用 store 中的缩放值
 			const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
 
 			// 限制缩放范围
@@ -153,7 +201,7 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 
 			// 计算新的位置以保持鼠标位置不变
 			const mousePointTo = {
-				x: (pointer.x - viewport.x) / oldScale,
+				x: (pointer.x - viewport.x) / oldScale,  // 使用 store 中的位置
 				y: (pointer.y - viewport.y) / oldScale,
 			}
 
@@ -162,13 +210,14 @@ const KonvaCanvas = React.forwardRef<KonvaCanvasRef, KonvaCanvasProps>((props, r
 				y: pointer.y - mousePointTo.y * clampedScale,
 			}
 
+			// 只更新 store，Stage 会通过受控属性自动更新
 			updateViewportTransform({
 				x: newPos.x,
 				y: newPos.y,
 				scale: clampedScale,
 			})
 		},
-		[viewport, updateViewportTransform]
+		[viewport.scale, viewport.x, viewport.y, updateViewportTransform]
 	)
 
 	// 文件上传按钮点击
