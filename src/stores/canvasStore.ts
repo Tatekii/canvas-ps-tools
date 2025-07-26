@@ -5,6 +5,7 @@ import {
   Viewport, 
   Workspace, 
   Point, 
+  Rectangle,
   CoordinateSystem 
 } from './types'
 import { 
@@ -36,6 +37,11 @@ interface CanvasState {
   
   // Actions - 工作区操作  
   setWorkspace: (workspace: Partial<Workspace>) => void
+  setWorkspaceBounds: (bounds: Rectangle) => void
+  expandWorkspace: (bounds: Rectangle) => void
+  autoExpandForContent: (contentBounds: Rectangle) => void
+  fitWorkspaceToContent: () => void
+  resetWorkspace: () => void
   
   // Actions - Konva集成
   setStageRef: (ref: React.RefObject<Konva.Stage>) => void
@@ -218,6 +224,71 @@ export const useCanvasStore = create<CanvasState>()(
         workspace: { ...state.workspace, ...newWorkspace }
       })),
     
+    setWorkspaceBounds: (bounds) =>
+      set((state) => ({
+        workspace: { ...state.workspace, bounds }
+      })),
+    
+    expandWorkspace: (bounds) => {
+      const { workspace } = get()
+      
+      // 计算新的工作区边界
+      const newBounds = {
+        x: Math.min(workspace.bounds.x, bounds.x),
+        y: Math.min(workspace.bounds.y, bounds.y),
+        width: Math.max(
+          workspace.bounds.x + workspace.bounds.width, 
+          bounds.x + bounds.width
+        ) - Math.min(workspace.bounds.x, bounds.x),
+        height: Math.max(
+          workspace.bounds.y + workspace.bounds.height,
+          bounds.y + bounds.height
+        ) - Math.min(workspace.bounds.y, bounds.y)
+      }
+      
+      // 限制在最大尺寸内
+      newBounds.width = Math.min(newBounds.width, CANVAS_CONFIG.workspace.maxSize.width)
+      newBounds.height = Math.min(newBounds.height, CANVAS_CONFIG.workspace.maxSize.height)
+      
+      get().setWorkspaceBounds(newBounds)
+    },
+    
+    autoExpandForContent: (contentBounds) => {
+      const { workspace } = get()
+      
+      if (!workspace.autoExpand) return
+      
+      const padding = CANVAS_CONFIG.workspace.expandPadding
+      const expandedBounds = {
+        x: contentBounds.x - padding,
+        y: contentBounds.y - padding,
+        width: contentBounds.width + padding * 2,
+        height: contentBounds.height + padding * 2
+      }
+      
+      // 检查是否需要扩展
+      const needsExpansion = (
+        expandedBounds.x < workspace.bounds.x ||
+        expandedBounds.y < workspace.bounds.y ||
+        expandedBounds.x + expandedBounds.width > workspace.bounds.x + workspace.bounds.width ||
+        expandedBounds.y + expandedBounds.height > workspace.bounds.y + workspace.bounds.height
+      )
+      
+      if (needsExpansion) {
+        get().expandWorkspace(expandedBounds)
+      }
+    },
+    
+    fitWorkspaceToContent: () => {
+      // 这个函数需要访问图层数据，暂时留空
+      // 将在集成layerStore时实现
+      console.log('fitWorkspaceToContent: 需要图层数据支持')
+    },
+    
+    resetWorkspace: () => {
+      set({ workspace: { ...DEFAULT_WORKSPACE } })
+    },
+    
     // Konva集成
     setStageRef: (ref) => set({ stageRef: ref }),
     setReady: (ready) => set({ isReady: ready }),
@@ -332,8 +403,8 @@ export const useCanvasStore = create<CanvasState>()(
     centerView: () => {
       const { workspace } = get()
       const centeredPos = {
-        x: (workspace.width - CANVAS_CONFIG.viewport.width) / 2,
-        y: (workspace.height - CANVAS_CONFIG.viewport.height) / 2
+        x: (workspace.bounds.width - CANVAS_CONFIG.viewport.width) / 2,
+        y: (workspace.bounds.height - CANVAS_CONFIG.viewport.height) / 2
       }
       get().panTo(centeredPos)
     },
@@ -406,3 +477,22 @@ export const usePanTo = () => useCanvasStore((state) => state.panTo)
 export const usePanBy = () => useCanvasStore((state) => state.panBy)
 export const useCenterView = () => useCanvasStore((state) => state.centerView)
 export const useUpdateViewportTransform = () => useCanvasStore((state) => state.updateViewportTransform)
+
+// 工作区管理 hooks
+export const useWorkspaceActions = () => {
+  const setWorkspace = useCanvasStore((state) => state.setWorkspace)
+  const setWorkspaceBounds = useCanvasStore((state) => state.setWorkspaceBounds)
+  const expandWorkspace = useCanvasStore((state) => state.expandWorkspace)
+  const autoExpandForContent = useCanvasStore((state) => state.autoExpandForContent)
+  const fitWorkspaceToContent = useCanvasStore((state) => state.fitWorkspaceToContent)
+  const resetWorkspace = useCanvasStore((state) => state.resetWorkspace)
+  
+  return {
+    setWorkspace,
+    setWorkspaceBounds,
+    expandWorkspace,
+    autoExpandForContent,
+    fitWorkspaceToContent,
+    resetWorkspace
+  }
+}

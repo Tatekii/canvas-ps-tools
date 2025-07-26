@@ -1,6 +1,20 @@
 import React from 'react'
-import { useLayerStore } from '../stores/layerStore'
-import { Eye, EyeOff, Lock, Unlock, Trash2, Plus, GripVertical } from 'lucide-react'
+import { 
+  useLayerStore,
+  useActiveLayerForTools 
+} from '../stores/layerStore'
+import { 
+  Eye, 
+  EyeOff, 
+  Lock, 
+  Unlock, 
+  Trash2, 
+  Plus, 
+  GripVertical,
+  Target,
+  ImageIcon,
+  Info
+} from 'lucide-react'
 import type { ImageLayer } from '../stores/types'
 
 interface LayerPanelProps {
@@ -32,6 +46,15 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({ className }) => {
   const [draggedLayerId, setDraggedLayerId] = React.useState<string | null>(null)
   const [dragOverLayerId, setDragOverLayerId] = React.useState<string | null>(null)
   const [dragHandleHoveredLayerId, setDragHandleHoveredLayerId] = React.useState<string | null>(null)
+
+  // 添加活动图层和工具相关hooks
+  const activeLayer = useLayerStore((state) => {
+    const { layers, activeLayerId } = state
+    return activeLayerId ? layers.find(layer => layer.id === activeLayerId) || null : null
+  })
+
+  // 使用已定义的工具专用hook，避免重复计算
+  const activeLayerForTools = useActiveLayerForTools()
 
   // 切换可见性的辅助函数
   const toggleVisibility = (layerId: string) => {
@@ -169,6 +192,82 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({ className }) => {
           <Plus size={16} />
         </button>
       </div>
+
+      {/* 当前选中图层信息 */}
+      {activeLayer && (
+        <div className="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="w-4 h-4 text-green-400" />
+            <span className="text-sm font-medium text-green-400">当前活动图层</span>
+          </div>
+          
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-400">名称:</span>
+              <span className="text-white font-medium">{activeLayer.name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">尺寸:</span>
+              <span className="text-white">{activeLayer.displayWidth} × {activeLayer.displayHeight}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">位置:</span>
+              <span className="text-white">
+                ({Math.round(activeLayer.transform.x)}, {Math.round(activeLayer.transform.y)})
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">缩放:</span>
+              <span className="text-white">{Math.round(activeLayer.transform.scale * 100)}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">不透明度:</span>
+              <span className="text-white">{Math.round(activeLayer.opacity * 100)}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">混合模式:</span>
+              <span className="text-white capitalize">{activeLayer.blendMode}</span>
+            </div>
+            
+            {/* 工具相关信息 */}
+            {activeLayerForTools.layer && (
+              <div className="mt-3 pt-3 border-t border-gray-600">
+                <div className="flex items-center gap-2 mb-2">
+                  <ImageIcon className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-medium text-blue-400">工具数据</span>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">可见:</span>
+                    <span className={activeLayerForTools.isVisible ? "text-green-400" : "text-red-400"}>
+                      {activeLayerForTools.isVisible ? "是" : "否"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">锁定:</span>
+                    <span className={activeLayerForTools.isLocked ? "text-orange-400" : "text-gray-400"}>
+                      {activeLayerForTools.isLocked ? "是" : "否"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">像素数据:</span>
+                    <span className="text-white">
+                      {activeLayerForTools.width} × {activeLayerForTools.height}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">工具可用:</span>
+                    <span className={activeLayerForTools.layer && activeLayerForTools.isVisible && !activeLayerForTools.isLocked 
+                      ? "text-green-400" : "text-red-400"}>
+                      {activeLayerForTools.layer && activeLayerForTools.isVisible && !activeLayerForTools.isLocked ? "可用" : "不可用"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 图层列表 */}
       <div className="space-y-2">

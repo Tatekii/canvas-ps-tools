@@ -101,21 +101,27 @@ export interface SelectionData {
 
 // 视口配置 - 用户看到的固定窗口
 export interface Viewport {
-  width: number      // 视口宽度 (固定 1080)
-  height: number     // 视口高度 (固定 768)
+  width: number      // 视口宽度
+  height: number     // 视口高度
   x: number          // 视口在工作区中的位置
   y: number
-  scale: number      // 视口缩放级别 (0.1 - 5.0)
+  scale: number      // 视口缩放级别
 }
 
-// 工作区配置 - 虚拟的无限画布空间
+// 工作区配置 - 有边界的工作空间，支持动态扩展
 export interface Workspace {
-  width: number      // 工作区宽度 (16000)
-  height: number     // 工作区高度 (16000)
+  bounds: Rectangle      // 当前工作区边界
   backgroundColor: string // 背景色
   gridVisible: boolean    // 是否显示网格
   gridSize: number        // 网格大小
   snapToGrid: boolean     // 是否吸附到网格
+  autoExpand: boolean     // 是否自动扩展工作区
+}
+
+// 工作区尺寸定义
+export interface WorkspaceSize {
+  width: number
+  height: number
 }
 
 // 工具预览数据
@@ -130,18 +136,26 @@ export interface ToolPreviewData {
 export interface CanvasConfig {
   // 视口配置
   viewport: {
-    width: number        // 1080
-    height: number       // 768
-    minScale: number     // 0.1
-    maxScale: number     // 5.0
-    scaleStep: number    // 1.2
+    width: number        // 视口宽度
+    height: number       // 视口高度
+    minScale: number     // 最小缩放
+    maxScale: number     // 最大缩放
+    scaleStep: number    // 缩放步长
+    panSpeed: number     // 平移速度
+    wheelZoomSpeed: number // 滚轮缩放速度
+    boundaryPadding: number // 边界外的可平移距离
   }
   
   // 工作区配置
   workspace: {
-    width: number        // 16000
-    height: number       // 16000
-    backgroundColor: string
+    defaultSize: WorkspaceSize    // 默认工作区尺寸
+    maxSize: WorkspaceSize        // 最大工作区尺寸
+    minSize: WorkspaceSize        // 最小工作区尺寸
+    backgroundColor: string       // 背景色
+    autoExpand: boolean          // 是否自动扩展
+    expandPadding: number        // 扩展时的边距
+    gridSize: number             // 网格大小
+    snapToGrid: boolean          // 是否吸附网格
   }
   
   // 图片限制

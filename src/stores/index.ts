@@ -32,14 +32,20 @@ export {
   usePanTo,
   usePanBy,
   useCenterView,
-  useUpdateViewportTransform
+  useUpdateViewportTransform,
+  useWorkspaceActions
 } from './canvasStore'
 
 // 便捷 hooks 导出 - 图层相关（核心功能）
 export {
   useLayers,
   useActiveLayer,
+  useActiveLayerId,
   useVisibleLayers,
+  // 工具专用数据访问
+  useActiveLayerForTools,
+  useGetPixelColor,
+  useGetCompositePixelColor,
   // 图层操作
   useAddLayer,
   useRemoveLayer,

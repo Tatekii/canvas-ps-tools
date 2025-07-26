@@ -516,8 +516,154 @@ export const useActiveLayer = () =>
 		return activeLayerId ? layers.find((layer) => layer.id === activeLayerId) || null : null
 	})
 
+// 获取活动图层ID
+export const useActiveLayerId = () => useLayerStore((state) => state.activeLayerId)
+
 // 获取可见图层
 export const useVisibleLayers = () => useLayerStore((state) => state.layers.filter((layer) => layer.visible))
+
+/**
+ * 工具专用的活动图层数据 Hook
+ * 为工具操作提供优化的数据访问
+ */
+export const useActiveLayerForTools = () => {
+	// 只选择基础数据，避免在selector中进行复杂计算
+	const activeLayer = useLayerStore((state) => {
+		const { layers, activeLayerId } = state
+		return activeLayerId ? layers.find((layer) => layer.id === activeLayerId) || null : null
+	})
+
+	// 在hook外部进行计算，避免selector中的对象创建
+	if (!activeLayer) {
+		return {
+			layer: null,
+			imageData: null,
+			isVisible: false,
+			isLocked: false,
+			bounds: null,
+			pixelData: null,
+			width: 0,
+			height: 0,
+			opacity: 0,
+			blendMode: 'normal' as const
+		}
+	}
+
+	return {
+		layer: activeLayer,
+		imageData: activeLayer.imageData,
+		isVisible: activeLayer.visible,
+		isLocked: activeLayer.locked,
+		bounds: {
+			x: activeLayer.transform.x,
+			y: activeLayer.transform.y,
+			width: activeLayer.displayWidth * activeLayer.transform.scale,
+			height: activeLayer.displayHeight * activeLayer.transform.scale,
+			rotation: activeLayer.transform.rotation
+		},
+		pixelData: activeLayer.imageData.data,
+		width: activeLayer.imageData.width,
+		height: activeLayer.imageData.height,
+		opacity: activeLayer.opacity,
+		blendMode: activeLayer.blendMode
+	}
+}
+
+/**
+ * 获取图层在指定坐标的像素颜色 Hook
+ * 专为魔术棒工具设计
+ */
+export const useGetPixelColor = () => {
+	const getActiveLayer = useLayerStore((state) => state.getActiveLayer)
+	
+	return (x: number, y: number, layerId?: string) => {
+		const targetLayer = layerId 
+			? useLayerStore.getState().getLayerById(layerId)
+			: getActiveLayer()
+			
+		if (!targetLayer || !targetLayer.visible) {
+			return null
+		}
+
+		const { imageData, transform } = targetLayer
+		
+		// 转换坐标到图层本地坐标系
+		const localX = Math.floor((x - transform.x) / transform.scale)
+		const localY = Math.floor((y - transform.y) / transform.scale)
+		
+		// 检查坐标是否在图层范围内
+		if (localX < 0 || localX >= imageData.width || localY < 0 || localY >= imageData.height) {
+			return null
+		}
+		
+		// 获取像素数据 (RGBA)
+		const index = (localY * imageData.width + localX) * 4
+		const data = imageData.data
+		
+		return {
+			r: data[index],
+			g: data[index + 1],
+			b: data[index + 2],
+			a: data[index + 3],
+			// 考虑图层透明度
+			effectiveAlpha: (data[index + 3] / 255) * targetLayer.opacity
+		}
+	}
+}
+
+/**
+ * 获取多个图层在指定坐标的合成颜色 Hook
+ * 用于更精确的颜色采样
+ */
+export const useGetCompositePixelColor = () => {
+	const getVisibleLayers = useLayerStore((state) => state.getVisibleLayers)
+	
+	return (x: number, y: number) => {
+		const visibleLayers = getVisibleLayers()
+		if (visibleLayers.length === 0) return null
+		
+		// 从下到上合成颜色（考虑混合模式）
+		let compositeR = 0, compositeG = 0, compositeB = 0, compositeA = 0
+		
+		// 简化版本：仅处理normal混合模式
+		visibleLayers.forEach((layer) => {
+			const { imageData, transform, opacity } = layer
+			
+			// 转换坐标到图层本地坐标系
+			const localX = Math.floor((x - transform.x) / transform.scale)
+			const localY = Math.floor((y - transform.y) / transform.scale)
+			
+			// 检查坐标是否在图层范围内
+			if (localX >= 0 && localX < imageData.width && localY >= 0 && localY < imageData.height) {
+				const index = (localY * imageData.width + localX) * 4
+				const data = imageData.data
+				
+				const layerR = data[index]
+				const layerG = data[index + 1]
+				const layerB = data[index + 2]
+				const layerA = (data[index + 3] / 255) * opacity
+				
+				// Alpha compositing (简化版本)
+				if (layerA > 0) {
+					const alpha = layerA + compositeA * (1 - layerA)
+					if (alpha > 0) {
+						compositeR = (layerR * layerA + compositeR * compositeA * (1 - layerA)) / alpha
+						compositeG = (layerG * layerA + compositeG * compositeA * (1 - layerA)) / alpha
+						compositeB = (layerB * layerA + compositeB * compositeA * (1 - layerA)) / alpha
+						compositeA = alpha
+					}
+				}
+			}
+		})
+		
+		return {
+			r: Math.round(compositeR),
+			g: Math.round(compositeG),
+			b: Math.round(compositeB),
+			a: Math.round(compositeA * 255)
+		}
+	}
+}
 
 // Individual layer action hooks for stable references
 export const useAddLayer = () => useLayerStore((state) => state.addLayer)
